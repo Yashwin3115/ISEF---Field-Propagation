@@ -12,3 +12,7 @@
   Max rel. error over 0.5–5 mm: 8.9e-3 (N=600) → 2.0e-5 (N=19200).
   Ratio rises 2.7→3.9 (pre-asymptotic while h ~ r0), observed order 1.96. PASS.
 
+2026-10-24 — 2D manufactured solution, phi=sin(pi x)e^y, sigma=1+x+y, hx≠hy.
+  Matrix symmetric (|A-A^T|=0). N=10→320: error 2.9e-3 → 2.9e-6, order 2.00. PASS.
+
+  
