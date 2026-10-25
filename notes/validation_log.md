@@ -18,3 +18,8 @@
 2026-10-24 — 3D manufactured solution, phi=sin(pi x)sin(pi y)e^z, sigma=1+x+y+z, CG+AMG, rtol 1e-8.
   Symmetric; CG vs direct ~1e-10. N=8→64 (250k unknowns): order 2.00, CG iters 6→10. PASS.
 
+2026-10-25 — Step 4 nonuniform grid. Finite-volume form, symmetric matrix.
+  Stretched-grid test (neighbor ratio up to 1.42), two halvings: ratio 3.97, 3.99, order 2.00. PASS.
+  Tank grids: 13.1M / 7.9M / 4.3M unknowns (x1, x4/3, x2).
+  MacBook memory: 872 B/unknown (1M), 756 B/unknown (4M) → using 900. Working grid ~11.8 GB of 16.
+
