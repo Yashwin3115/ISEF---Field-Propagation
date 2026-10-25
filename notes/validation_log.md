@@ -15,4 +15,6 @@
 2026-10-24 — 2D manufactured solution, phi=sin(pi x)e^y, sigma=1+x+y, hx≠hy.
   Matrix symmetric (|A-A^T|=0). N=10→320: error 2.9e-3 → 2.9e-6, order 2.00. PASS.
 
-  
+2026-10-24 — 3D manufactured solution, phi=sin(pi x)sin(pi y)e^z, sigma=1+x+y+z, CG+AMG, rtol 1e-8.
+  Symmetric; CG vs direct ~1e-10. N=8→64 (250k unknowns): order 2.00, CG iters 6→10. PASS.
+
