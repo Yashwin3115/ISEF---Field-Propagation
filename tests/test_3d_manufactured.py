@@ -41,7 +41,7 @@ def grid(N):
 
 # 1) matrix symmetry, and CG+AMG agrees with the direct solver
 x, y, z, X, Y, Z = grid(12)
-A, b = build_system_3d(x, y, z, sigma_of(X, Y, Z), source_of(X, Y, Z), phi_exact(X, Y, Z))
+A, b, _ = build_system_3d(x, y, z, sigma_of(X, Y, Z), source_of(X, Y, Z), phi_exact(X, Y, Z))
 asym = abs(A - A.T).max()
 u_cg, _ = solve_cg_amg(A, b)
 u_direct = spsolve(A, b)

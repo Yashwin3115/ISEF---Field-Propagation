@@ -48,7 +48,7 @@ print(f"base grid: spacing {min(g.min() for g in hs):.3f} to {max(g.max() for g 
 
 # symmetry check on the base grid
 X, Y, Z = np.meshgrid(x0, y0, z0, indexing="ij")
-A, _ = build_system_3d(x0, y0, z0, sigma_of(X, Y, Z), source_of(X, Y, Z), phi_exact(X, Y, Z))
+A, _, _ = build_system_3d(x0, y0, z0, sigma_of(X, Y, Z), source_of(X, Y, Z), phi_exact(X, Y, Z))
 asym = abs(A - A.T).max() / abs(A).max()
 print(f"matrix symmetry: max |A - A^T| / max |A| = {asym:.1e}\n")
 
