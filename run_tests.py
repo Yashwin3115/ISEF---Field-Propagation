@@ -1,6 +1,6 @@
 """Run every verification test and print one summary table.
 
-    python run_tests.py          all quick tests (~3-4 minutes)
+    python run_tests.py          all quick tests (~5 minutes)
     python run_tests.py --all    also the step 7 working-grid run (~5 more minutes)
 
 Plan step 13: if any test fails, fix the solver and re-run ALL tests before
@@ -29,6 +29,8 @@ QUICK = [
     ("V2 spreading resistance",      ["tests/test_v2_spreading.py"]),
     ("V3 mode consistency",          ["tests/test_v3_mode_consistency.py"]),
     ("V4 current conservation",      ["tests/test_v4_conservation.py"]),
+    ("V5 grid convergence + GCI",    ["tests/test_v5_grid_convergence.py"]),
+    ("V6 reciprocity",               ["tests/test_v6_reciprocity.py"]),
     ("V7 half-space far field",      ["tests/test_v7_far_field.py"]),
 ]
 SLOW = [
