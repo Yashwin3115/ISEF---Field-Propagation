@@ -2,3 +2,5 @@
 __pycache__/
 .DS_Store
 notes/notes
+results/predictions_quick/
+figures/quick/

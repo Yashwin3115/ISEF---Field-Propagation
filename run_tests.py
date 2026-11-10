@@ -32,6 +32,10 @@ QUICK = [
     ("V5 grid convergence + GCI",    ["tests/test_v5_grid_convergence.py"]),
     ("V6 reciprocity",               ["tests/test_v6_reciprocity.py"]),
     ("V7 half-space far field",      ["tests/test_v7_far_field.py"]),
+    ("MaxOne layout and grid",       ["tests/test_maxone_layout.py"]),
+    ("Interface circuit vs ODE",     ["tests/test_interface.py"]),
+    ("Full array vs exact series",   ["tests/test_array_image_series.py"]),
+    ("Prediction pipeline (quick)",  ["runs/predict_array.py", "--quick"]),
 ]
 SLOW = [
     ("Step 7 point source (x1)",     ["tests/step7_point_source_cube.py"]),
@@ -48,7 +52,8 @@ for name, cmd in tests:
                           env={**__import__("os").environ, **env})
     dt = time.perf_counter() - t0
     out = proc.stdout + proc.stderr
-    ok = proc.returncode == 0 and "PASS" in out and "FAIL" not in out
+    is_test = cmd[0].startswith("tests/")
+    ok = proc.returncode == 0 and (("PASS" in out and "FAIL" not in out) if is_test else True)
     results.append((name, ok, dt))
     if not ok:
         print("\n".join(out.strip().splitlines()[-15:]))      # show what went wrong
