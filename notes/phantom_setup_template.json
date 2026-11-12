@@ -1,0 +1,110 @@
+{
+  "_comment": "Part 6/7 phantom geometry. Units: mm, S/m, A. Edit to match the apparatus BEFORE committing predictions. Fields marked ASSUMED are not in research plan v13 and are guesses.",
+  "part6": {
+    "tank_inside_mm": [
+      300.0,
+      200.0,
+      150.0
+    ],
+    "fill_depth_mm": 100.0,
+    "stim_xy_mm": [
+      150.0,
+      100.0
+    ],
+    "stim_disk_diameter_mm": 0.5,
+    "plate_mm": [
+      60.0,
+      60.0,
+      5.0
+    ],
+    "return_xy_mm": [
+      290.0,
+      100.0
+    ],
+    "return_exposed_z_mm": [
+      40.0,
+      60.0
+    ],
+    "return_wire_diameter_mm": 0.5,
+    "recording_direction_xy": [
+      0.0,
+      1.0
+    ],
+    "recording_distances_mm": [
+      1.0,
+      1.5,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      7.0,
+      10.0,
+      15.0,
+      20.0
+    ],
+    "recording_tip_z_mm": [
+      0.5,
+      1.5
+    ],
+    "position_uncertainty_mm": 0.1,
+    "tip_height_uncertainty_mm": 0.25,
+    "sigma_nominal_S_per_m": 1.55,
+    "current_nominal_A": [
+      5e-05,
+      0.0001
+    ],
+    "alt_reference_xyz_mm": [
+      20.0,
+      190.0,
+      50.0
+    ]
+  },
+  "part7": {
+    "container_inner_diameter_mm": 150.0,
+    "agar_diameter_mm": 80.0,
+    "agar_centre_offset_mm": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "stim_offsets_mm": [
+      [
+        15.0,
+        0.0,
+        0.0
+      ],
+      [
+        25.0,
+        0.0,
+        0.0
+      ]
+    ],
+    "stim_tip_length_mm": 1.0,
+    "stim_wire_diameter_mm": 0.5,
+    "return_position_mm": [
+      -65.0,
+      0.0,
+      0.0
+    ],
+    "return_exposed_length_mm": 5.0,
+    "recording_radius_mm": 72.0,
+    "recording_layout": "icosahedron",
+    "line_positions_mm": [
+      20,
+      25,
+      30,
+      35,
+      38,
+      42,
+      45,
+      50,
+      55,
+      60,
+      65,
+      70
+    ],
+    "sigma_in_nominal_S_per_m": 2.9,
+    "sigma_out_nominal_S_per_m": 0.8,
+    "_note": "Plan v13 step 65 puts the return electrode OUTSIDE the outer container. If the container wall is insulating, no current can reach it -- the return must be inside the saline. Default here: inside, near the wall opposite the stimulating offset. Confirm before committing."
+  }
+}

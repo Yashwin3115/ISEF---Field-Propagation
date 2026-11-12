@@ -1,0 +1,4 @@
+session,date,part,sigma_start,sigma_end,sigma_rel_sd,temp_start_C,temp_end_C,sigma_in_start,sigma_in_end
+1,2026-11-22,6,,,0.005,,,,
+2,2026-11-23,6,,,0.005,,,,
+3,2026-11-24,7,,,0.005,,,,

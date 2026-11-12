@@ -32,7 +32,7 @@ Recording electrodes
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from fd3d import solve_general, current_out_of
+from fd3d import solve_general, current_out_of, grid_shape
 
 
 # --------------------------------------------------------------------------
@@ -112,7 +112,7 @@ def stimulate(x, y, z, sigma, stim, mode, value, return_mask,
     if np.any(stim & return_mask):
         raise ValueError("stimulating electrode overlaps the return contact")
 
-    shape = sigma.shape
+    shape = grid_shape(sigma)
     fixed = return_mask.copy()
     phi_fixed = np.zeros(shape) if return_potential is None else return_potential.copy()
     phi_fixed[~return_mask] = 0.0

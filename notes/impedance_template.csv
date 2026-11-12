@@ -1,0 +1,7 @@
+condition,repeat,frequency_Hz,V_resistor,V_electrode,phase_deg
+cell,1,10,,,
+cell,1,100,,,
+cell,1,1000,,,
+cell,1,10000,,,
+cell,1,100000,,,
+lifted,1,10,,,

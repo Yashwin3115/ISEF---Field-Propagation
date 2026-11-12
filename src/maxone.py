@@ -52,6 +52,7 @@ PROVISIONAL = {
     "well_half_width_m": 9.5 * mm,
     "stim_col_row": (110, 60),          # next to the array centre
     "return": "top_plate",
+    "anisotropy": None,                 # None = isotropic; or (ax, ay, az) x sigma
     "status": "provisional -- awaiting lab answers (email Nov 9, 2026)",
 }
 
@@ -113,7 +114,7 @@ def build_grid(chip, stim_xy, depth, half_width, n_pad=8, growth=1.10,
         hr = RING_WIDTH / 4 * (h_array / (50 * um))
         for zs, a in [(zx, ax), (zy, ay)]:
             lo, hi = a + RING_GAP, a + RING_GAP + RING_WIDTH
-            zs += [(lo, hi, hr, growth - 1), (-hi, -lo, hr, growth - 1)]
+            zs += [(lo, hi, hr, 1 - 1 / growth), (-hi, -lo, hr, 1 - 1 / growth)]
     x = graded_axis(-half_width, half_width, stim_xy[0], hx, px, growth, h_far, zones=zx)
     y = graded_axis(-half_width, half_width, stim_xy[1], hy, py, growth, h_far, zones=zy)
     hz = min(hx, hy)
@@ -187,7 +188,11 @@ def transfer_run(params=None, n_pad=8, growth=1.10, h_array=50 * um, h_far=0.5 *
               f"stim pad {p['stim_col_row']}, return '{p['return']}'")
         size_report(x, y, z, n_unknowns=int(np.prod(shape) - ret.sum() - stim.sum() + 1))
 
-    sigma = np.full(shape, p["sigma_S_per_m"])
+    a = p.get("anisotropy")            # (ax, ay, az) multipliers of sigma, or None
+    if a is None:
+        sigma = np.full(shape, p["sigma_S_per_m"])
+    else:
+        sigma = tuple(np.full(shape, p["sigma_S_per_m"] * float(f)) for f in a)
     r = stimulate(x, y, z, sigma, stim, "current", I_test, ret,
                   reference=("return",), params=p)
 

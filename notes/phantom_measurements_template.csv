@@ -1,0 +1,5 @@
+part,session,position,stim_index,pulse_width_us,current_A,current_rel_sd,plateau_V,plateau_V_sd,n_traces,noise_floor_V
+6,1,0,0,100,5.0e-5,0.01,,,20,
+6,1,1,0,100,5.0e-5,0.01,,,20,
+7,3,0,0,100,5.0e-5,0.01,,,20,
+7,3,L0,0,100,5.0e-5,0.01,,,20,

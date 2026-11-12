@@ -5,9 +5,9 @@
   - MaxOne pad area 8.75 x 12.00 = 105 um^2 (User Guide table)
   - on the solver grid, the stimulating pad is drawn with its edges exactly on
     nodes, for both chip types, at several stimulation positions
-  - in x and y, spacing never grows by more than the set rate (plus up to 1%
-    where the last stretch is re-split to end exactly on the well wall), and is
-    never coarser than the cap over the array
+  - in x, y and z, neighbouring cells never differ by more than the set
+    growth rate (including where the cells land on the well walls and the
+    fluid surface), and cells are never coarser than the cap over the array
 """
 import sys
 from pathlib import Path
@@ -43,11 +43,12 @@ for chip in CHIPS:
         ix = np.flatnonzero(m[:, :, 0].any(axis=1))
         iy = np.flatnonzero(m[:, :, 0].any(axis=0))
         drawn = (X[ix[-1]] - X[ix[0]], Y[iy[-1]] - Y[iy[0]])
-        g = max(np.max(h[1:] / h[:-1]) for h in (np.diff(X), np.diff(Y)))
+        g = max(max(np.max(h[1:] / h[:-1]), np.max(h[:-1] / h[1:]))
+                for h in (np.diff(X), np.diff(Y), np.diff(Z)))
         cap = max(np.diff(X)[(X[:-1] > -ax) & (X[1:] < ax)].max(),
                   np.diff(Y)[(Y[:-1] > -ay) & (Y[1:] < ay)].max())
         good = (max(edges) < 1e-12 and abs(drawn[0] - 2 * px) < 1e-12
-                and abs(drawn[1] - 2 * py) < 1e-12 and g <= 1.2 * 1.01 and cap <= 100 * um * (1 + 1e-9))
+                and abs(drawn[1] - 2 * py) < 1e-12 and g <= 1.2 * (1 + 1e-9) and cap <= 100 * um * (1 + 1e-9))
         ok.append(good)
         print(f"{chip:8s} pad {cr}: edges on nodes {max(edges)/um:.1e} um, drawn "
               f"{drawn[0]/um:.2f} x {drawn[1]/um:.2f} um, max growth {g:.3f}, "

@@ -1,0 +1,423 @@
+{
+  "status": "provisional -- awaiting lab answers (email Nov 9, 2026)",
+  "created_utc": "2026-11-10T15:30:50+00:00",
+  "code_commit": "5195ef7",
+  "quick_mode": true,
+  "settings": {
+    "chip": "MaxOne",
+    "sigma_S_per_m": 1.5,
+    "depth_m": 0.0035,
+    "well_half_width_m": 0.0095,
+    "stim_col_row": [
+      110,
+      60
+    ],
+    "status": "provisional -- awaiting lab answers (email Nov 9, 2026)"
+  },
+  "chip": {
+    "pad_x": 8.75e-06,
+    "pad_y": 1.2e-05,
+    "coating": "platinum black",
+    "z_1kHz": [
+      300000.0,
+      600000.0
+    ],
+    "recommended_mV": [
+      300,
+      600
+    ]
+  },
+  "returns": {
+    "top_plate": "fluid surface held at 0 V (a large return above the array); side walls insulating",
+    "well_wall": "side walls of the well held at 0 V (a ring return far away); fluid surface insulating (air)",
+    "periphery": "a 50 um wide ring on the substrate, 100 um outside the array (like the edge reference electrode in Ronchi et al. 2019); walls and fluid surface insulating"
+  },
+  "grid_levels": [
+    {
+      "n_pad": 4,
+      "growth": 1.2,
+      "h_array": 9.999999999999999e-05,
+      "h_far": 0.001,
+      "f": 2.0
+    }
+  ],
+  "per_return": {
+    "top_plate": {
+      "unknowns": [
+        481942
+      ],
+      "R_solution_ohm": [
+        25562.674327406377
+      ],
+      "probes": [
+        {
+          "pitches": 1,
+          "distance_um": 17.5,
+          "Z_ohm_coarse_to_fine": [
+            5999.978898461353
+          ]
+        },
+        {
+          "pitches": 2,
+          "distance_um": 35.0,
+          "Z_ohm_coarse_to_fine": [
+            3012.341816232117
+          ]
+        },
+        {
+          "pitches": 5,
+          "distance_um": 87.5,
+          "Z_ohm_coarse_to_fine": [
+            1189.9644797080582
+          ]
+        },
+        {
+          "pitches": 10,
+          "distance_um": 175.0,
+          "Z_ohm_coarse_to_fine": [
+            581.6116881500208
+          ]
+        },
+        {
+          "pitches": 20,
+          "distance_um": 349.99999999999994,
+          "Z_ohm_coarse_to_fine": [
+            281.52612252924035
+          ]
+        },
+        {
+          "pitches": 50,
+          "distance_um": 875.0,
+          "Z_ohm_coarse_to_fine": [
+            100.60146268219914
+          ]
+        },
+        {
+          "pitches": 100,
+          "distance_um": 1750.0,
+          "Z_ohm_coarse_to_fine": [
+            40.36777180621588
+          ]
+        }
+      ]
+    },
+    "well_wall": {
+      "unknowns": [
+        476622
+      ],
+      "R_solution_ohm": [
+        25591.659803194878
+      ],
+      "probes": [
+        {
+          "pitches": 1,
+          "distance_um": 17.5,
+          "Z_ohm_coarse_to_fine": [
+            6028.964154974854
+          ]
+        },
+        {
+          "pitches": 2,
+          "distance_um": 35.0,
+          "Z_ohm_coarse_to_fine": [
+            3041.326410614502
+          ]
+        },
+        {
+          "pitches": 5,
+          "distance_um": 87.5,
+          "Z_ohm_coarse_to_fine": [
+            1218.9447261116222
+          ]
+        },
+        {
+          "pitches": 10,
+          "distance_um": 175.0,
+          "Z_ohm_coarse_to_fine": [
+            610.5767124332134
+          ]
+        },
+        {
+          "pitches": 20,
+          "distance_um": 349.99999999999994,
+          "Z_ohm_coarse_to_fine": [
+            310.4305944349324
+          ]
+        },
+        {
+          "pitches": 50,
+          "distance_um": 875.0,
+          "Z_ohm_coarse_to_fine": [
+            129.08887603784075
+          ]
+        },
+        {
+          "pitches": 100,
+          "distance_um": 1750.0,
+          "Z_ohm_coarse_to_fine": [
+            67.43188537407524
+          ]
+        }
+      ]
+    },
+    "periphery": {
+      "unknowns": [
+        715168
+      ],
+      "R_solution_ohm": [
+        25576.11352977464
+      ],
+      "probes": [
+        {
+          "pitches": 1,
+          "distance_um": 17.5,
+          "Z_ohm_coarse_to_fine": [
+            6013.417125058889
+          ]
+        },
+        {
+          "pitches": 2,
+          "distance_um": 35.0,
+          "Z_ohm_coarse_to_fine": [
+            3025.7795411306247
+          ]
+        },
+        {
+          "pitches": 5,
+          "distance_um": 87.5,
+          "Z_ohm_coarse_to_fine": [
+            1203.4054182731427
+          ]
+        },
+        {
+          "pitches": 10,
+          "distance_um": 175.0,
+          "Z_ohm_coarse_to_fine": [
+            595.0729218815954
+          ]
+        },
+        {
+          "pitches": 20,
+          "distance_um": 349.99999999999994,
+          "Z_ohm_coarse_to_fine": [
+            295.07654817135847
+          ]
+        },
+        {
+          "pitches": 50,
+          "distance_um": 875.0,
+          "Z_ohm_coarse_to_fine": [
+            114.42485103711
+          ]
+        },
+        {
+          "pitches": 100,
+          "distance_um": 1750.0,
+          "Z_ohm_coarse_to_fine": [
+            45.140572053848175
+          ]
+        }
+      ]
+    }
+  },
+  "interface": {
+    "C_dl_F_range": [
+      2.6525823848649227e-10,
+      5.305164769729845e-10
+    ],
+    "impedance_1kHz_ohm_range": [
+      300000.0,
+      600000.0
+    ],
+    "R_buf_ohm": 0.0,
+    "R_ct_ohm": "infinite",
+    "phase_s": 0.0002,
+    "by_return": {
+      "top_plate": {
+        "R_solution_used_ohm": 25562.674327406377,
+        "pulses": [
+          {
+            "amplitude_V": 0.4,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.780709963091694e-06,
+            "peak_current_A": 3.1295630095412205e-05,
+            "charge_phase1_C": 1.0610329539458046e-10
+          },
+          {
+            "amplitude_V": 0.4,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.3561419926183388e-05,
+            "peak_current_A": 3.1295630095412205e-05,
+            "charge_phase1_C": 2.122065072469345e-10
+          },
+          {
+            "amplitude_V": 0.5,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.780709963091694e-06,
+            "peak_current_A": 3.911953761926526e-05,
+            "charge_phase1_C": 1.3262911924322558e-10
+          },
+          {
+            "amplitude_V": 0.5,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.3561419926183388e-05,
+            "peak_current_A": 3.911953761926526e-05,
+            "charge_phase1_C": 2.6525813405866814e-10
+          },
+          {
+            "amplitude_V": 0.6,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.780709963091694e-06,
+            "peak_current_A": 4.694344514311831e-05,
+            "charge_phase1_C": 1.5915494309187066e-10
+          },
+          {
+            "amplitude_V": 0.6,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.3561419926183388e-05,
+            "peak_current_A": 4.694344514311831e-05,
+            "charge_phase1_C": 3.1830976087040176e-10
+          }
+        ]
+      },
+      "well_wall": {
+        "R_solution_used_ohm": 25591.659803194878,
+        "pulses": [
+          {
+            "amplitude_V": 0.4,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.788398599341045e-06,
+            "peak_current_A": 3.1260184222210067e-05,
+            "charge_phase1_C": 1.0610329539457991e-10
+          },
+          {
+            "amplitude_V": 0.4,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.357679719868209e-05,
+            "peak_current_A": 3.1260184222210067e-05,
+            "charge_phase1_C": 2.1220650583976896e-10
+          },
+          {
+            "amplitude_V": 0.5,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.788398599341045e-06,
+            "peak_current_A": 3.907523027776258e-05,
+            "charge_phase1_C": 1.3262911924322489e-10
+          },
+          {
+            "amplitude_V": 0.5,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.357679719868209e-05,
+            "peak_current_A": 3.907523027776258e-05,
+            "charge_phase1_C": 2.652581322997112e-10
+          },
+          {
+            "amplitude_V": 0.6,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.788398599341045e-06,
+            "peak_current_A": 4.689027633331509e-05,
+            "charge_phase1_C": 1.5915494309186986e-10
+          },
+          {
+            "amplitude_V": 0.6,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.357679719868209e-05,
+            "peak_current_A": 4.689027633331509e-05,
+            "charge_phase1_C": 3.183097587596534e-10
+          }
+        ]
+      },
+      "periphery": {
+        "R_solution_used_ohm": 25576.11352977464,
+        "pulses": [
+          {
+            "amplitude_V": 0.4,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.784274822238563e-06,
+            "peak_current_A": 3.1279185520844424e-05,
+            "charge_phase1_C": 1.0610329539458022e-10
+          },
+          {
+            "amplitude_V": 0.4,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.3568549644477127e-05,
+            "peak_current_A": 3.1279185520844424e-05,
+            "charge_phase1_C": 2.122065065970236e-10
+          },
+          {
+            "amplitude_V": 0.5,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.784274822238563e-06,
+            "peak_current_A": 3.9098981901055524e-05,
+            "charge_phase1_C": 1.3262911924322525e-10
+          },
+          {
+            "amplitude_V": 0.5,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.3568549644477127e-05,
+            "peak_current_A": 3.9098981901055524e-05,
+            "charge_phase1_C": 2.652581332462795e-10
+          },
+          {
+            "amplitude_V": 0.6,
+            "C_dl_F": 2.6525823848649227e-10,
+            "tau_s": 6.784274822238563e-06,
+            "peak_current_A": 4.691877828126663e-05,
+            "charge_phase1_C": 1.591549430918703e-10
+          },
+          {
+            "amplitude_V": 0.6,
+            "C_dl_F": 5.305164769729845e-10,
+            "tau_s": 1.3568549644477127e-05,
+            "peak_current_A": 4.691877828126663e-05,
+            "charge_phase1_C": 3.183097598955354e-10
+          }
+        ]
+      }
+    }
+  },
+  "return_path_spread": [
+    {
+      "pitches": 1,
+      "min_ohm": 5999.978898461353,
+      "max_ohm": 6028.964154974854,
+      "spread_percent": 0.4819534067618579
+    },
+    {
+      "pitches": 2,
+      "min_ohm": 3012.341816232117,
+      "max_ohm": 3041.326410614502,
+      "spread_percent": 0.9576990293819118
+    },
+    {
+      "pitches": 5,
+      "min_ohm": 1189.9644797080582,
+      "max_ohm": 1218.9447261116222,
+      "spread_percent": 2.4067875658124853
+    },
+    {
+      "pitches": 10,
+      "min_ohm": 581.6116881500208,
+      "max_ohm": 610.5767124332134,
+      "spread_percent": 4.861912007906043
+    },
+    {
+      "pitches": 20,
+      "min_ohm": 281.52612252924035,
+      "max_ohm": 310.4305944349324,
+      "spread_percent": 9.775666722468076
+    },
+    {
+      "pitches": 50,
+      "min_ohm": 100.60146268219914,
+      "max_ohm": 129.08887603784075,
+      "spread_percent": 24.83535822037891
+    },
+    {
+      "pitches": 100,
+      "min_ohm": 40.36777180621588,
+      "max_ohm": 67.43188537407524,
+      "spread_percent": 53.08762848738711
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 """Run every verification test and print one summary table.
 
     python run_tests.py          all quick tests (~5 minutes)
-    python run_tests.py --all    also the step 7 working-grid run (~5 more minutes)
+    python run_tests.py --all    also the step 7 working-grid run and the quick
+                                 Aim 3 runs (~25 more minutes)
 
 Plan step 13: if any test fails, fix the solver and re-run ALL tests before
 going on. Run this after every change to anything in src/.
@@ -36,9 +37,22 @@ QUICK = [
     ("Interface circuit vs ODE",     ["tests/test_interface.py"]),
     ("Full array vs exact series",   ["tests/test_array_image_series.py"]),
     ("Prediction pipeline (quick)",  ["runs/predict_array.py", "--quick"]),
+    ("Positions pipeline (quick)",   ["runs/positions_point_source.py", "--quick"]),
+    ("Neuron models (HH, Mainen)",   ["tests/test_neuron.py"]),
+    ("Aim 2 recovery tools",         ["tests/test_recovery.py"]),
+    ("Aim 2 pipeline (quick)",       ["runs/aim2_recovery.py", "--quick"]),
+    ("Anisotropic point source",     ["tests/test_anisotropic.py"]),
+    ("Phantom analysis chain",       ["tests/test_phantom_compare.py"]),
+    ("Array comparison (fake data)", ["tests/test_array_compare.py"]),
+    ("Phantom predictions (quick)",  ["runs/phantom_predict.py", "--quick"]),
+    ("Saturation map (quick)",       ["runs/saturation_map.py", "--quick"]),
+    ("Aim 2 budget study (quick)",   ["runs/aim2_budget.py", "--quick"]),
 ]
 SLOW = [
     ("Step 7 point source (x1)",     ["tests/step7_point_source_cube.py"]),
+    ("Aim 3 pipeline (quick)",       ["runs/aim3_activation.py", "--quick"]),
+    ("Aim 3 maps (quick)",           ["runs/aim3_maps.py", "--quick"]),
+    ("Anisotropic MaxOne (quick)",   ["runs/anisotropic_maxone.py", "--quick"]),
 ]
 
 tests = QUICK + (SLOW if "--all" in sys.argv else [])

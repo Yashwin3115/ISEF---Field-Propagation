@@ -48,10 +48,12 @@ def graded_axis(lo, hi, center, h_min, half_width, growth, h_far, zones=()):
           zones = [(a, b, h_cap), ...]   spacing <= h_cap for a <= s <= b
       (e.g. the whole recording array, so every recording electrode is
       surrounded by fine-enough cells), and h_far everywhere else.
-      A zone may have a 4th entry, `slope`: then outside [a, b] the cap rises
-      gradually, h_cap + slope * (distance from the zone). With
-      slope = growth - 1 the cells shrink smoothly as the zone is approached
-      (used around the return ring).
+      Outside [a, b] the zone's cap does not jump straight to h_far; it rises
+      gradually, h_cap + slope * (distance from the zone). The default slope,
+      growth - 1, lets cells leaving a zone keep growing at the set rate. A 4th
+      entry sets the slope; 1 - 1/growth makes cells approaching a zone shrink
+      by at most the set rate (used around the return ring). Because the caps
+      change smoothly, the wall-landing step below always works.
     """
     n_pad = int(round(half_width / h_min))
     if abs(n_pad * h_min - half_width) > 1e-9 * half_width:
@@ -61,39 +63,63 @@ def graded_axis(lo, hi, center, h_min, half_width, growth, h_far, zones=()):
         c = h_far
         for zone in zones:
             a, b, hc = zone[:3]
-            slope = zone[3] if len(zone) > 3 else None
+            slope = zone[3] if len(zone) > 3 else growth - 1
             if a <= s <= b:
                 c = min(c, hc)
-            elif slope is not None:
+            else:
                 c = min(c, hc + slope * (a - s if s < a else s - b))
         return c
+
+    def walk(direction, D, gg, n_cells=None):
+        """Pad nodes, then cells growing by gg (capped by zones).
+        n_cells None: stop before the first cell that would reach D, and also
+        return that cell's size. Otherwise: exactly n_cells cells past the pad."""
+        n0 = min(n_pad, int(np.floor(D / h_min + 1e-9)))
+        pts = list(np.arange(n0 + 1) * h_min)            # exact pad nodes
+        pos, h, count = pts[-1], h_min, 0
+        while True:
+            h = min(h * gg, cap(center + direction * pos))
+            if n_cells is None and pos + h >= D:
+                return np.array(pts), n0, h
+            if n_cells is not None and count == n_cells:
+                return np.array(pts), n0, h
+            pos += h
+            pts.append(pos)
+            count += 1
 
     def march(direction, D):
         if D <= 0:
             return np.array([0.0])
-        n0 = min(n_pad, int(np.floor(D / h_min + 1e-9)))
-        pts = list(np.arange(n0 + 1) * h_min)            # exact pad nodes
-        pos, h = pts[-1], h_min
-        while True:
-            h = min(h * growth, cap(center + direction * pos))
-            if pos + h >= D:
-                break
-            pos += h
-            pts.append(pos)
-        # Finish exactly at the wall without a lopsided last cell: take the
-        # run of equal-sized cells at the end (if any) together with the
-        # leftover distance, and re-split that stretch into equal cells.
-        pts = np.array(pts)
+        pts, n0, h_next = walk(direction, D, growth)
         d = np.diff(pts)
+        rest = D - pts[-1]
         if len(d) <= n0:                     # wall reached inside the pad region
-            return np.append(pts, D) if D - pts[-1] > 1e-12 * D else pts
+            return np.append(pts, D) if rest > 1e-12 * D else pts
+        if rest <= 1e-12 * D:
+            return pts
         h_last = d[-1]
-        k = len(d) - 1                       # first cell of the equal-size tail
-        while k - 1 >= n0 and abs(d[k - 1] / h_last - 1) < 1e-9:
-            k -= 1
-        stretch = D - pts[k]
-        n = max(1, int(round(stretch / h_last)))
-        return np.concatenate([pts[:k + 1], pts[k] + stretch * np.arange(1, n + 1) / n])
+        if rest >= h_last:
+            # the leftover is at least as big as the last cell (and always
+            # smaller than the next cell would have been): one more cell
+            return np.append(pts, D)
+        # Otherwise add one more cell and lower the growth rate slightly
+        # (bisection) until the cells land exactly on the wall. The end
+        # position rises smoothly with the growth rate, so this always works,
+        # and growth never exceeds `growth` (zone caps are still respected).
+        n_cells = len(d) - n0 + 1
+        lo, hi_g = 1.0, growth
+        if walk(direction, D, lo, n_cells)[0][-1] >= D:
+            # only possible if the wall is a few cells past the pad
+            return np.append(pts[:-1], D) if len(pts) > n0 + 1 else np.append(pts, D)
+        for _ in range(200):
+            mid = 0.5 * (lo + hi_g)
+            if walk(direction, D, mid, n_cells)[0][-1] < D:
+                lo = mid
+            else:
+                hi_g = mid
+        out = walk(direction, D, hi_g, n_cells)[0]
+        out[-1] = D                           # remove the last rounding error
+        return out
 
     right = center + march(+1, hi - center)
     left = center - march(-1, center - lo)[::-1]

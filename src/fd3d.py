@@ -29,6 +29,13 @@ Three kinds of node
             it. Used for a stimulating electrode in CURRENT mode (current = I)
             and for passive recording electrodes (current = 0).
 
+Anisotropic media (Nov 11, 2026)
+  sigma may be ONE array (isotropic) or a tuple of THREE arrays
+  (sigma_x, sigma_y, sigma_z): an axis-aligned tensor diag(sx, sy, sz). Each
+  face uses the component along its own direction (harmonic mean across the
+  face), so an x-face carries sigma_x, a z-face sigma_z. Verified against the
+  exact anisotropic point source (tests/test_anisotropic.py).
+
 Insulating surfaces (Neumann, zero current)
   Any outer face that is not fixed is insulating automatically, because there
   is no neighbor on the other side for current to reach. The MEA substrate at
@@ -48,6 +55,23 @@ import pyamg
 # --------------------------------------------------------------------------
 # grid helpers
 # --------------------------------------------------------------------------
+
+def components(sigma):
+    """(sigma_x, sigma_y, sigma_z) for isotropic or anisotropic input."""
+    if isinstance(sigma, (tuple, list)):
+        if len(sigma) != 3:
+            raise ValueError("anisotropic sigma must be (sigma_x, sigma_y, sigma_z)")
+        s = tuple(np.asarray(c, dtype=float) for c in sigma)
+        if not (s[0].shape == s[1].shape == s[2].shape):
+            raise ValueError("sigma_x, sigma_y, sigma_z must have the same shape")
+        return s
+    s = np.asarray(sigma, dtype=float)
+    return (s, s, s)
+
+
+def grid_shape(sigma):
+    return components(sigma)[0].shape
+
 
 def half(sigma, axis, averaging="harmonic"):
     """Conductivity halfway between neighboring nodes along one axis."""
@@ -89,9 +113,11 @@ def face_mask(shape, faces="all"):
 # --------------------------------------------------------------------------
 
 def conductance_matrix(x, y, z, sigma, averaging="harmonic"):
-    """Symmetric N x N matrix L over ALL nodes: (L phi)_i = current out of node i."""
-    shape = sigma.shape
-    N = sigma.size
+    """Symmetric N x N matrix L over ALL nodes: (L phi)_i = current out of node i.
+    sigma: one array, or (sigma_x, sigma_y, sigma_z) for an anisotropic medium."""
+    comps = components(sigma)
+    shape = comps[0].shape
+    N = comps[0].size
     idx = np.arange(N).reshape(shape)
     dx, dy, dz = cell_widths(x), cell_widths(y), cell_widths(z)
     gaps = (np.diff(x), np.diff(y), np.diff(z))
@@ -107,7 +133,7 @@ def conductance_matrix(x, y, z, sigma, averaging="harmonic"):
         q_sl = [slice(None)] * 3; q_sl[axis] = slice(1, n)
         p_sl, q_sl = tuple(p_sl), tuple(q_sl)
         gshape = [1, 1, 1]; gshape[axis] = n - 1
-        G = half(sigma, axis, averaging) * areas[axis][p_sl] / gaps[axis].reshape(gshape)
+        G = half(comps[axis], axis, averaging) * areas[axis][p_sl] / gaps[axis].reshape(gshape)
         G = np.broadcast_to(G, idx[p_sl].shape).ravel()
         p, q = idx[p_sl].ravel(), idx[q_sl].ravel()
         rows += [p, q]
@@ -167,13 +193,16 @@ def check_inputs(x, y, z, sigma, source, phi_fixed, fixed, floating=()):
         if not np.all(np.diff(a) > 0):
             raise ValueError(f"{name} must be strictly increasing (no repeated or "
                              f"backwards nodes)")
-    for name, a in [("sigma", sigma), ("source", source), ("phi_fixed", phi_fixed),
-                    ("fixed", fixed)]:
+    comps = components(sigma)
+    arrays = [(f"sigma_{'xyz'[k]}" if comps[0] is not comps[1] else "sigma", comps[k])
+              for k in range(3 if comps[0] is not comps[1] else 1)]
+    for name, a in arrays + [("source", source), ("phi_fixed", phi_fixed), ("fixed", fixed)]:
         if a.shape != shape:
             raise ValueError(f"{name} has shape {a.shape}, grid is {shape}")
-    if not np.all(np.isfinite(sigma)) or np.any(sigma <= 0):
-        raise ValueError("sigma must be positive and finite everywhere "
-                         f"(min found: {np.nanmin(sigma):.3g})")
+    for name, a in arrays:
+        if not np.all(np.isfinite(a)) or np.any(a <= 0):
+            raise ValueError(f"{name} must be positive and finite everywhere "
+                             f"(min found: {np.nanmin(a):.3g})")
     if not np.all(np.isfinite(source)):
         raise ValueError("source contains NaN or infinity")
     if not fixed.any():
@@ -202,7 +231,8 @@ def solve_general(x, y, z, sigma, source=None, fixed=None, phi_fixed=None,
                   floating=(), averaging="harmonic", rtol=1e-8):
     """Solve with any mix of fixed, floating and free nodes.
 
-    sigma      conductivity (S/m) at every node
+    sigma      conductivity (S/m) at every node: one array, or
+               (sigma_x, sigma_y, sigma_z) for an axis-aligned anisotropic medium
     source     current density (A/m^3) at every node; the current injected at a
                node is source * (control volume). Default: none.
     fixed      boolean mask of fixed-potential nodes. Default: all six outer faces.
@@ -213,7 +243,7 @@ def solve_general(x, y, z, sigma, source=None, fixed=None, phi_fixed=None,
     Returns (phi, info). info["L"] is the conductance matrix, kept so delivered
     currents can be computed afterwards (see current_out_of).
     """
-    shape = sigma.shape
+    shape = grid_shape(sigma)
     if source is None:
         source = np.zeros(shape)
     if fixed is None:
@@ -224,7 +254,7 @@ def solve_general(x, y, z, sigma, source=None, fixed=None, phi_fixed=None,
     check_inputs(x, y, z, sigma, source, phi_fixed, fixed, floating)
 
     L = conductance_matrix(x, y, z, sigma, averaging)
-    N = sigma.size
+    N = int(np.prod(shape))
     fixed_f = fixed.ravel()
     phiF = np.where(fixed_f, phi_fixed.ravel(), 0.0)
     inj = (source * node_volumes(x, y, z)).ravel()
@@ -276,7 +306,7 @@ def current_out_of(L, phi, mask):
 def build_system_3d(x, y, z, sigma, source, phi_fixed, fixed=None, averaging="harmonic"):
     """Return A, b, unknown_mask for the free nodes (no floating conductors)."""
     if fixed is None:
-        fixed = face_mask(sigma.shape)
+        fixed = face_mask(grid_shape(sigma))
     if not fixed.any():
         raise ValueError("at least one fixed-potential node is needed")
     L = conductance_matrix(x, y, z, sigma, averaging)
@@ -292,7 +322,7 @@ def build_system_3d(x, y, z, sigma, source, phi_fixed, fixed=None, averaging="ha
 def solve_3d(x, y, z, sigma, source, phi_fixed, fixed=None, averaging="harmonic", rtol=1e-8):
     """Solve with fixed nodes only; return (full potential array, solver statistics)."""
     if fixed is None:
-        fixed = face_mask(sigma.shape)
+        fixed = face_mask(grid_shape(sigma))
     phi, st = solve_general(x, y, z, sigma, source, fixed, phi_fixed,
                             averaging=averaging, rtol=rtol)
     st.pop("L")

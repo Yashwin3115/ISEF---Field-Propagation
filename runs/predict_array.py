@@ -1,9 +1,13 @@
 """PROVISIONAL blind predictions for stimulation on the MaxOne array.
 
-    python runs/predict_array.py           full run: 3 return paths x 3 grids
-    python runs/predict_array.py --quick   one coarse grid per return (testing only;
-                                           writes to results/predictions_quick/ and
-                                           figures/quick/, never the real prediction)
+    python runs/predict_array.py --label v2      full run: 3 return paths x 3 grids
+    python runs/predict_array.py --quick         one coarse grid per return (testing only)
+
+Output goes to results/runs/<label>/ and figures/runs/<label>/. An existing
+label is never overwritten (add --overwrite to allow it), so a committed blind
+prediction cannot be replaced by accident. The first committed prediction,
+tag provisional-prediction-v1, lives in results/predictions/ and figures/
+and is never touched by this script.
 
 Every unconfirmed setting comes from maxone.PROVISIONAL and is written into
 every output file. Re-run with the lab's values when they reply, and commit
@@ -42,9 +46,17 @@ from interface import (capacitance_from_impedance, biphasic, circuit_current,
                        pulse_summary, sample_average)
 
 QUICK = "--quick" in sys.argv
-# quick mode writes somewhere else, so a test run can never overwrite the real prediction
-OUT = ROOT / "results" / ("predictions_quick" if QUICK else "predictions")
-FIG = ROOT / "figures" / ("quick" if QUICK else "")
+if QUICK:
+    LABEL = "quick"
+elif "--label" in sys.argv:
+    LABEL = sys.argv[sys.argv.index("--label") + 1]
+else:
+    sys.exit("give the run a label, e.g.  python runs/predict_array.py --label v2")
+OUT = ROOT / "results" / "runs" / LABEL
+FIG = ROOT / "figures" / "runs" / LABEL
+if OUT.exists() and not QUICK and "--overwrite" not in sys.argv:
+    sys.exit(f"{OUT.relative_to(ROOT)} already exists -- choose a new --label "
+             f"(or add --overwrite if you really mean it)")
 OUT.mkdir(parents=True, exist_ok=True)
 FIG.mkdir(parents=True, exist_ok=True)
 
@@ -124,6 +136,7 @@ summary = {
     "created_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     "code_commit": git_commit(),
     "quick_mode": QUICK,
+    "label": LABEL,
     "settings": {k: v for k, v in p.items() if k != "return"},
     "chip": chip,
     "returns": RETURNS,
@@ -304,4 +317,4 @@ for q in ip:
     if q["amplitude_V"] == 0.5:
         print(f"  C {q['C_dl_F']*1e9:.3f} nF: tau {q['tau_s']*1e6:.1f} us, peak current "
               f"{q['peak_current_A']*1e6:.1f} uA, charge/phase {q['charge_phase1_C']*1e12:.0f} pC")
-print(f"\ntotal time {time.perf_counter() - t_all:.0f} s; wrote {OUT.relative_to(ROOT)}/ and figures/")
+print(f"\ntotal time {time.perf_counter() - t_all:.0f} s; wrote {OUT.relative_to(ROOT)}/ and {FIG.relative_to(ROOT)}/")

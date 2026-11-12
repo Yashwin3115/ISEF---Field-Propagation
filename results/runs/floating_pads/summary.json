@@ -1,0 +1,140 @@
+{
+  "settings": {
+    "chip": "MaxOne",
+    "sigma_S_per_m": 1.5,
+    "depth_m": 0.0035,
+    "well_half_width_m": 0.0095,
+    "stim_col_row": [
+      110,
+      60
+    ],
+    "return": "top_plate",
+    "status": "provisional -- awaiting lab answers (email Nov 9, 2026)"
+  },
+  "grid_nodes": [
+    211,
+    269,
+    77
+  ],
+  "block": "3 x 3",
+  "neighbours": [
+    {
+      "dcol": -1,
+      "drow": -1,
+      "distance_um": 24.74873734152916,
+      "A_centre_mV_per_uA": 4.312285636447373,
+      "A_footprint_mV_per_uA": 4.354900074292932,
+      "B_floating_mV_per_uA": 4.307780590546492,
+      "B_vs_A_centre_percent": -0.10447002542697259,
+      "footprint_vs_centre_percent": 0.9882099990172755
+    },
+    {
+      "dcol": -1,
+      "drow": 0,
+      "distance_um": 17.5,
+      "A_centre_mV_per_uA": 6.055529964244013,
+      "A_footprint_mV_per_uA": 6.095552172225795,
+      "B_floating_mV_per_uA": 5.810617419942905,
+      "B_vs_A_centre_percent": -4.044444429261162,
+      "footprint_vs_centre_percent": 0.6609199891355555
+    },
+    {
+      "dcol": -1,
+      "drow": 1,
+      "distance_um": 24.74873734152916,
+      "A_centre_mV_per_uA": 4.312288007815885,
+      "A_footprint_mV_per_uA": 4.354902461753226,
+      "B_floating_mV_per_uA": 4.307783068256356,
+      "B_vs_A_centre_percent": -0.10446750197029564,
+      "footprint_vs_centre_percent": 0.988209828752229
+    },
+    {
+      "dcol": 0,
+      "drow": -1,
+      "distance_um": 17.5,
+      "A_centre_mV_per_uA": 6.281947806536807,
+      "A_footprint_mV_per_uA": 6.520571352549908,
+      "B_floating_mV_per_uA": 6.397797510121442,
+      "B_vs_A_centre_percent": 1.8441685151233678,
+      "footprint_vs_centre_percent": 3.7985598314713265
+    },
+    {
+      "dcol": 0,
+      "drow": 1,
+      "distance_um": 17.5,
+      "A_centre_mV_per_uA": 6.281950768233012,
+      "A_footprint_mV_per_uA": 6.520574368749266,
+      "B_floating_mV_per_uA": 6.397800796896549,
+      "B_vs_A_centre_percent": 1.8441728204776187,
+      "footprint_vs_centre_percent": 3.798558908212768
+    },
+    {
+      "dcol": 1,
+      "drow": -1,
+      "distance_um": 24.74873734152916,
+      "A_centre_mV_per_uA": 4.312288920343566,
+      "A_footprint_mV_per_uA": 4.354903372030144,
+      "B_floating_mV_per_uA": 4.307784074547898,
+      "B_vs_A_centre_percent": -0.10446530552293831,
+      "footprint_vs_centre_percent": 0.9882095674420333
+    },
+    {
+      "dcol": 1,
+      "drow": 0,
+      "distance_um": 17.5,
+      "A_centre_mV_per_uA": 6.05553420554055,
+      "A_footprint_mV_per_uA": 6.095556440608773,
+      "B_floating_mV_per_uA": 5.810621766757272,
+      "B_vs_A_centre_percent": -4.0444398540296245,
+      "footprint_vs_centre_percent": 0.6609199735277516
+    },
+    {
+      "dcol": 1,
+      "drow": 1,
+      "distance_um": 24.74873734152916,
+      "A_centre_mV_per_uA": 4.312291330663513,
+      "A_footprint_mV_per_uA": 4.354905807330324,
+      "B_floating_mV_per_uA": 4.307786518595695,
+      "B_vs_A_centre_percent": -0.10446446499996487,
+      "footprint_vs_centre_percent": 0.9882095943702041
+    }
+  ],
+  "farther": [
+    {
+      "pitches": 5,
+      "A_mV_per_uA": 1.189960632107762,
+      "B_mV_per_uA": 1.1908976680842127,
+      "B_vs_A_percent": 0.0787451240963355
+    },
+    {
+      "pitches": 10,
+      "A_mV_per_uA": 0.5847406530757706,
+      "B_mV_per_uA": 0.5848580268290274,
+      "B_vs_A_percent": 0.02007278827620418
+    },
+    {
+      "pitches": 20,
+      "A_mV_per_uA": 0.281636768813117,
+      "B_mV_per_uA": 0.2816513302037458,
+      "B_vs_A_percent": 0.005170273288568339
+    },
+    {
+      "pitches": 50,
+      "A_mV_per_uA": 0.10028926934402065,
+      "B_mV_per_uA": 0.100290223764273,
+      "B_vs_A_percent": 0.0009516673704190737
+    },
+    {
+      "pitches": 100,
+      "A_mV_per_uA": 0.04040992994999934,
+      "B_mV_per_uA": 0.040410057582630596,
+      "B_vs_A_percent": 0.00031584472286461107
+    }
+  ],
+  "R_pad_to_return_ohm": {
+    "A_ignored": 26693.91119465159,
+    "B_floating_metal": 25940.358481165815
+  },
+  "largest_effect_neighbours_percent": 4.044444429261162,
+  "largest_effect_far_percent": 0.0787451240963355
+}
