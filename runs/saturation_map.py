@@ -20,6 +20,8 @@ The ideal voltage source makes this an UPPER bound on saturation.
 Usage:
     python runs/saturation_map.py           (~3 min, ~4 GB)
     python runs/saturation_map.py --quick
+    python runs/saturation_map.py --rsrc 100000   (stimulator output resistance, ohm;
+                                                   default 0 = ideal source, the upper bound)
 Outputs: results/runs/saturation[_quick]/summary.json,
          figures/runs/saturation[_quick]/usable_fraction.png and saturation_map.png
 """
@@ -38,7 +40,8 @@ from maxone import transfer_run, PITCH, N_COLS, N_ROWS, PROVISIONAL, CHIPS, um, 
 from interface import capacitance_from_impedance, biphasic, circuit_current
 
 QUICK = "--quick" in sys.argv
-label = "saturation_quick" if QUICK else "saturation"
+R_SRC = float(sys.argv[sys.argv.index("--rsrc") + 1]) if "--rsrc" in sys.argv else 0.0
+label = ("saturation_quick" if QUICK else "saturation") + (f"_rsrc{R_SRC/1e3:g}k" if R_SRC else "")
 OUT = ROOT / "results" / "runs" / label
 FIG = ROOT / "figures" / "runs" / label
 OUT.mkdir(parents=True, exist_ok=True); FIG.mkdir(parents=True, exist_ok=True)
@@ -64,14 +67,14 @@ print(f"fields solved ({time.time()-t0:.0f} s)")
 def unusable_until(Z, R_sol, z1k, rng_V, rec_s):
     """Per electrode: time (s) after onset until the LAST unusable sample ends
     (0 if never saturated), and the per-sample unusable mask."""
-    i = circuit_current(t_fine, biphasic(AMP, PHASE), R_sol, capacitance_from_impedance(z1k))
+    i = circuit_current(t_fine, biphasic(AMP, PHASE), R_sol, capacitance_from_impedance(z1k), R_SRC)
     peak_in_sample = np.abs(i).reshape(n_s, SUB).max(1)          # A
     clipped = np.abs(Z)[:, None] * peak_in_sample[None, :] > rng_V
     last = np.where(clipped.any(1), n_s - 1 - np.argmax(clipped[:, ::-1], axis=1), -1)
     until = np.where(last >= 0, (last + 1) * TS + rec_s, 0.0)
     return until
 
-summary = {"quick": QUICK, "grid": GRID, "amplitude_V": AMP, "phase_s": PHASE,
+summary = {"quick": QUICK, "grid": GRID, "amplitude_V": AMP, "phase_s": PHASE, "R_source_ohm": R_SRC,
            "ranges_mV": RANGES_mV, "recovery_ms": RECOVERY_ms, "cases": {}}
 times = np.arange(0, 3.01e-3, 50e-6)
 fig, axs = plt.subplots(1, len(RETURNS), figsize=(15, 4.4), sharey=True, layout="constrained")
@@ -102,7 +105,8 @@ axs[0].set_ylabel("usable electrodes (% of 26,399)")
 axs[0].legend(frameon=False, fontsize=8, title="input range (line style:\nrecovery 0.1 / 0.5 / 2 ms)",
               title_fontsize=8)
 fig.suptitle("Step 18: fraction of the array that can record, after a 500 mV pulse (|Z| 300 kOhm; "
-             "ideal source = upper bound on saturation)" + (" -- QUICK" if QUICK else ""))
+             + (f"stimulator R {R_SRC/1e3:g} kOhm)" if R_SRC else "ideal source = upper bound on saturation)")
+             + (" -- QUICK" if QUICK else ""))
 fig.savefig(FIG / "usable_fraction.png", dpi=200)
 
 # map: saturation duration at +-3 mV, 0.5 ms recovery, top plate

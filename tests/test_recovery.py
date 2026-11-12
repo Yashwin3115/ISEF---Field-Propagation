@@ -72,4 +72,19 @@ g, meas = electrode_gains(y, usable, ib, onset, np.full(n_el, -99.0))
 check("onset gains", np.allclose(g[1:], G[1:], rtol=1e-9) and g[0] == -99.0 and not meas[0],
       f"max rel. error {np.max(np.abs(g[1:]/G[1:]-1)):.1e}; saturated electrode -> fallback")
 
+# 6 SALPA, original implementation (skipped if the package is not installed)
+from recovery import salpa_available, salpa_clean
+if salpa_available():
+    tt = -1e-3 + np.arange(120) * TS
+    art = np.where(tt > 0.2e-3, 2e-3 * np.exp(-(tt - 0.2e-3) / 0.6e-3), 0)
+    y = (art + rng.normal(0, 5e-6, 120))[None, :]
+    u = np.ones_like(y, bool); u[0, 20:25] = False; y[0, 20:25] = 3e-3
+    c, ok = salpa_clean(y, u, np.array([5e-6]), 3e-3)
+    late = ok[0] & (tt > 2.5e-3)
+    rms = np.std(c[0][late]) * 1e6
+    check("SALPA (original) removes a slow artifact", late.sum() > 20 and rms < 8,
+          f"residual {rms:.1f} uV rms after 2.5 ms (noise 5; artifact up to 2000 uV)")
+else:
+    print("SKIP  SALPA (original): package not installed -- pip install salpa (Python >= 3.12)")
+
 print("ALL PASS" if ok_all else "SOME FAILED")

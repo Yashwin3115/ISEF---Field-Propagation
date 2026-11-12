@@ -1,74 +1,86 @@
-"""Aim 2 as specified in research plan v13 (steps 19-30): calibration cost of
-artifact removal.
+"""Aim 2 as specified in research plan v16 (steps 19-31): calibration cost of
+artifact removal, robustness to pulse-to-pulse variability.
 
 Question: how many calibration pulses does each method need to recover spikes,
-and does a physics template need fewer than an empirical one?
+does a physics template need fewer than an empirical one, and does that hold
+when the artifact varies from pulse to pulse?
 
-Synthetic ground truth (step 19; generated noise -- labelled as such):
+Synthetic ground truth (step 19; GENERATED noise -- labelled as such):
   TRUE world: well-wall return, sigma 1.5 S/m, |Z| 450 kOhm (between the
   published 300-600), stimulator output resistance 10 kOhm, 500 mV biphasic,
-  200 us per phase. Spikes from a library of 5 waveform classes
-  (recovery.WAVEFORMS), 50-200 uV: background firing 20 Hz on every electrode,
-  plus evoked spikes on 40% of electrodes (fixed latency 0.15-2.5 ms per
-  electrode, jitter 30 us, fires on 60% of pulses). Noise 5 uV. Amplifier:
-  +-3 mV range, 0.1 ms recovery, 20 kHz, 50 us averaging, and a first-order
-  high-pass (AC coupling) either off or at 300 Hz -- the filter setting is
-  undocumented, so both are run; the physics template applies the same
-  (known, user-set) filter to i(t). With no filter the artifact is only the
-  ~10 us current spikes at the pulse edges; the filter turns each into a
-  millisecond tail, as seen in real recordings.
-  Spike times, waveforms and amplitudes are kept in a separate array the
-  methods never see.
+  200 us per phase. Spikes from 5 PARAMETRIC waveform classes
+  (recovery.WAVEFORMS; not digitized published templates), 50-200 uV:
+  background firing 20 Hz on every electrode, plus evoked spikes on 40% of
+  electrodes (fixed latency 0.15-2.5 ms per electrode, jitter 30 us, fires on
+  60% of pulses). Noise 5 uV. Amplifier: +-3 mV, 20 kHz, 50 us averaging,
+  first-order high-pass off or at 300 Hz (setting undocumented; the 300 Hz
+  corner is a stated basis: Ronchi et al. 2019 split their noise figures at
+  300 Hz -- not confirmation of what the lab runs). After clipping, the channel
+  is unusable for 0.1 ms (no filter) or 3 filter time constants (with filter).
+  Spike times, waveforms and amplitudes stay in a separate array.
+
+Pulse-to-pulse VARIABILITY (step 27), levels swept from zero:
+  per pulse: amplitude x N(1, a); interface capacitance (so tau) x N(1, c);
+  slow baseline drift: a linear trend across the pulse train, d x g_k at
+  each electrode (g_k ~ N(0, 1)), from -d to +d over the 60 pulses.
+  Levels (ASSUMED -- no published pulse-to-pulse figures were found):
+    none (0, 0, 0), low (1%, 2%, 5 uV), medium (3%, 5%, 10 uV), high (10%, 10%, 25 uV)
 
 Splits (step 20): 60 pulses -> calibration 30 / validation 10 / test 20,
-  whole pulses, frozen in notes/aim2_split.json (created once with its seed;
-  commit it; it is never regenerated). Templates come from calibration
-  pulses; detector thresholds from validation pulses; the test split is
-  scored once.
+  whole pulses, frozen in notes/aim2_split.json. Templates from calibration
+  pulses only; detector thresholds from validation pulses; test scored once.
 
-Methods (step 26), all with the same detector and the same budget:
-  no correction
-  blanking 0-1 ms with linear interpolation
-  per-channel average template (mean of the budget's calibration pulses)
-  low-rank empirical model: SVD of that mean, rank 1-20 swept, best rank
-    chosen on the VALIDATION split at each budget (step 24)
-  physics template, scale + time constant (step 22): (alpha Zhat) * i(t; tau)
-  physics template + uniform offset: (alpha Zhat + beta) * i(t; tau)
-    (the offset was found necessary on Nov 10; reported as an extension)
-  The physics template is built from DELIBERATELY WRONG models (step 21):
-  each return path x sigma +-10% x |Z| 300 / 600 kOhm = 12 variants.
+Processing arms (step 26), same detector, same budget, same traces:
+  1 no correction
+  2 blanking 0-1 ms with linear interpolation
+  3 per-channel average template (mean of the budget's calibration pulses,
+    each sample averaged over the pulses in which it was usable)
+  4 low-rank empirical, FIXED: SVD of that mean, rank 1-20 swept, best rank
+    chosen on the validation split at each budget (step 24)
+  5 low-rank empirical, PER-PULSE: the spatial basis (rank r, chosen the same
+    way) frozen from calibration; its coefficients refitted on each pulse
+    from that pulse's own trace
+  6 physics template, FIXED: (alpha Zhat + beta) i(t; tau), the three numbers
+    fitted on the calibration pulses and held fixed (step 22)
+  7 physics template, PER-PULSE: the same three numbers refitted on each pulse
+    from that pulse's own trace (no calibration pulses needed -> flat line)
+  supplementary: physics fixed with scale + tau only (no offset), so the
+    offset's contribution stays visible (step 22)
+  8 SALPA (step 28): the ORIGINAL implementation (author's PyPI package
+    `salpa` 1.0, GPL-3.0-or-later, installed not copied) with the author's
+    command-line defaults; per channel, no calibration -> flat line. Its main
+    comparison is physics per-pulse. Reported twice: the author's pure
+    defaults, and with the original tool's forced peg over the stimulus
+    itself (0-0.45 ms; set by the pulse, not tuned). Skipped if not installed.
+  The physics template is built from the provisional WRONG model (top-plate
+  return, sigma x1.1, 300 kOhm); at variability "none" the full stress test
+  of step 21 (each return path x sigma +-10% x 300 / 600 kOhm) is also run.
+
+Spike-absorption check (step 22): the per-pulse physics fit is repeated on the
+  same test pulses with the spikes removed (same noise); the shift in each of
+  the three parameters is reported against that parameter's pulse-to-pulse
+  spread.
 
 Budgets (step 23): 1, 2, 5, 10, 20 calibration pulses, 10 random draws each.
-
-Detector: negative threshold crossing at -k x noise (noise from the
-  pre-pulse baseline, MAD). k is set per method, budget and draw on the
-  validation split: the smallest k in 4.0-12.0 giving <= 2 false detections
-  per electrode per second in 0-3 ms after the pulse ("fixed false-positive
-  rate"). A detection matches a planted spike within +-2 samples (step 28).
-
-Earliest recovery time (step 29): delay bins 0-0.25-0.5-0.75-1-1.5-2-2.5 ms;
-  a bin passes if >= 90% of evoked spikes are found and <= 5% of detections
-  in it are false; earliest recovery = start of the first bin from which every
-  later bin passes. Non-saturated spikes only.
-
-Effective degrees of freedom (step 25): physics = number of linear
-  coefficients (trace of the hat matrix of the linear least squares) + 1
-  nonlinear (tau); low-rank rank r on an n_el x n_t matrix = r (n_el + n_t - r);
-  per-channel average = n_el x n_t.
-
-Failure diagnostics (step 30) for the physics template at budget 20:
-  spatial  -- per-electrode residual gain (residual projected on i(t))
-              correlated with each return path's pattern
-  waveform -- residual projected on i(t) and on d i / d tau
-  clipping -- share of missed spikes that fall in saturated samples
+Detector: threshold -k x noise, k set per arm/budget/draw on the validation
+  split as the smallest k in 4-12 giving <= 2 false detections per electrode
+  per second in 0-3 ms (fixed false-positive rate). Match tolerance +-2
+  samples (step 29). Earliest recovery time (step 30): delay bins 0-0.25-0.5-
+  0.75-1-1.5-2-2.5 ms; a bin passes with >= 90% found and <= 5% false; earliest
+  = start of the first bin from which every later bin passes.
+Effective degrees of freedom (step 25): physics = linear coefficients (trace of
+  the hat matrix) + 1 nonlinear; low-rank fixed r (n_el + n_t - r); low-rank
+  per-pulse r x n_t per pulse (+ the frozen basis); per-channel n_el x n_t.
+Failure diagnostics (step 31) for the physics template at budget 20.
 
 Usage:
-    python runs/aim2_budget.py            (~15-25 min)
-    python runs/aim2_budget.py --quick    (2 draws, 3 budgets, 2 variants)
+    python runs/aim2_budget.py            (~1.5-3 h; leave it running)
+    python runs/aim2_budget.py --quick    (2 draws, 3 budgets, 2 levels, ~3 min)
 """
 import sys
 import json
 import time
+import itertools
 from pathlib import Path
 import numpy as np
 import matplotlib
@@ -80,7 +92,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from maxone import transfer_run, PITCH, PROVISIONAL, um, mm
 from interface import capacitance_from_impedance
 from recovery import (WAVEFORMS, record, noise_level, detect_fast, fit_physics, lowrank,
-                      blank_interp, unit_current_fine, bin_average, TS)
+                      blank_interp, unit_current_fine, unit_current_binned, bin_average, TS,
+                      salpa_available, salpa_clean, SALPA_LABEL, SALPA_PEG_LABEL, SALPA_DEFAULTS)
 
 QUICK = "--quick" in sys.argv
 label = "aim2_budget_quick" if QUICK else "aim2_budget"
@@ -99,6 +112,10 @@ if QUICK:
     VARIANTS = [("top_plate", 1.1, 300e3), ("periphery", 0.9, 600e3)]
 PROVISIONAL_VARIANT = ("top_plate", 1.1, 300e3)
 BUDGETS = [1, 5, 20] if QUICK else [1, 2, 5, 10, 20]
+LEVELS = {"none": (0.0, 0.0, 0.0), "low": (0.01, 0.02, 5e-6),
+          "medium": (0.03, 0.05, 10e-6), "high": (0.10, 0.10, 25e-6)}
+if QUICK:
+    LEVELS = {k: LEVELS[k] for k in ("none", "high")}
 N_DRAWS = 2 if QUICK else 10
 RANGES_mV = [3]
 HP_LIST = [300.0] if QUICK else [None, 300.0]          # amplifier high-pass corner (Hz); None = off
@@ -140,6 +157,7 @@ R_true = Ft["R_solution_ohm"] / TRUE["sigma_factor"]
 C_true = capacitance_from_impedance(TRUE["z1k"])
 i_true = AMP * unit_current_fine(R_true, C_true, t_fine - T0, -T0, PHASE, TRUE["R_buf"])
 art_fine = Z_true[:, None] * i_true[None, :]
+drift_pattern = np.random.default_rng(4242).normal(0, 1, n_el)   # g_k, fixed per electrode
 
 N_PULSES = 60
 split_file = ROOT / "notes" / ("aim2_split_quick.json" if QUICK else "aim2_split.json")
@@ -204,12 +222,23 @@ def fp_rate(fp_samples, n_pulse):
     return m.sum() / (n_el * n_pulse * (POST.sum() * TS))
 
 def calibrate_k(clean_list, usable_list, sigma_list, truth_list, _inst=None):
-    """Smallest k with validation false-detection rate <= FP_TARGET."""
-    for k in K_GRID:
+    """Smallest k in K_GRID with validation false-detection rate <= FP_TARGET,
+    found by bisection (the false-detection rate falls as k rises)."""
+    def ok(k):
         fps = [score(c, u, s, k, tr)[1] for c, u, s, tr in zip(clean_list, usable_list, sigma_list, truth_list)]
-        if fp_rate(np.concatenate(fps), len(clean_list)) <= FP_TARGET:
-            return float(k)
-    return float(K_GRID[-1])
+        return fp_rate(np.concatenate(fps), len(clean_list)) <= FP_TARGET
+    lo, hi = 0, len(K_GRID) - 1
+    if ok(K_GRID[lo]):
+        return float(K_GRID[lo])
+    if not ok(K_GRID[hi]):
+        return float(K_GRID[hi])
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if ok(K_GRID[mid]):
+            hi = mid
+        else:
+            lo = mid
+    return float(K_GRID[hi])
 
 def evaluate(clean_list, usable_list, sigma_list, truth_list, inst_list, k):
     """Test-split statistics at threshold k. A spike is 'saturated' (excluded)
@@ -255,7 +284,7 @@ def evaluate(clean_list, usable_list, sigma_list, truth_list, inst_list, k):
 from recovery import unit_current_binned
 
 def _diagnose(tmpl, C, Rh, Zh, test_ids, data, found, ev, sat, r, blank_earliest):
-    """Step 30: attribute a physics-template failure to space, time or clipping."""
+    """Step 31: attribute a physics-template failure to space, time or clipping."""
     Rm = np.mean([data[p][0] - tmpl for p in test_ids], axis=0)
     Um = np.all([data[p][1] for p in test_ids], axis=0) & WIN[None, :]
     ib = unit_current_binned(Rh, C, t_fine - T0, -T0, SUB, PHASE, HP)
@@ -307,38 +336,83 @@ def _diagnose(tmpl, C, Rh, Zh, test_ids, data, found, ev, sat, r, blank_earliest
             "missed_on_clipped_channels_share": clip_share}
 
 
+# ------------------------------------------------------------------ helpers
+def lowrank_basis(M, U_all, r):
+    U, s, Vt = np.linalg.svd(np.where(U_all, M, 0.0), full_matrices=False)
+    return U[:, :r]
+
+def perpulse_project(y, u, Ur):
+    """Artifact estimate for ONE pulse: at each sample, least-squares fit of
+    the frozen spatial basis Ur to the usable electrodes of this pulse."""
+    out = Ur @ (Ur.T @ np.where(u, y, 0.0))
+    partial = np.flatnonzero(~u.all(axis=0))
+    for t_ in partial:
+        m = u[:, t_]
+        if m.sum() <= Ur.shape[1]:
+            out[:, t_] = 0.0
+            continue
+        c, *_ = np.linalg.lstsq(Ur[m], y[m, t_], rcond=None)
+        out[:, t_] = Ur @ c
+    return out
+
+def physics_perpulse(y, u, Zh, Rh, HP):
+    model, coef, C = fit_physics(y, u, Zh, Rh, C_GRID, t_fine - T0, -T0, SUB, PHASE,
+                                 window=WIN, offset=True, hp_hz=HP, refine=True)
+    return model, coef, C
+
+def make_data(HP, level, with_spikes=True, ids=None):
+    """Recorded traces for every pulse under filter HP and variability level."""
+    a_j, c_j, d_v = LEVELS[level]
+    jr = np.random.default_rng(31 + list(LEVELS).index(level))
+    amp_f = 1 + a_j * jr.normal(size=N_PULSES)
+    cap_f = np.clip(1 + c_j * jr.normal(size=N_PULSES), 0.5, 1.5)
+    rec_n = RECOVER if not HP else int(np.ceil(3 / (2 * np.pi * HP) / TS))
+    data, truth_par = {}, {}
+    for p in (range(N_PULSES) if ids is None else ids):
+        i_p = AMP * amp_f[p] * unit_current_fine(R_true, C_true * cap_f[p], t_fine - T0, -T0, PHASE,
+                                                 TRUE["R_buf"])
+        drift = d_v * (2 * p / (N_PULSES - 1) - 1) * drift_pattern
+        art = Z_true[:, None] * i_p[None, :] + drift[:, None]
+        sp, truth = pulses[p]
+        y, s = record(art, sp if with_spikes else np.zeros_like(sp), NOISE, SAT_V, SUB, rec_n,
+                      np.random.default_rng(5000 + p), hp_hz=HP)
+        data[p] = (y, ~s, noise_level(y, BASE), truth)
+        truth_par[p] = {"amplitude_factor": float(amp_f[p]), "capacitance_factor": float(cap_f[p])}
+    return data, truth_par
+
+
 # ------------------------------------------------------------------ main loop
+SAT_V = RANGES_mV[0] * 1e-3
 results = {"settings": {"true_world": TRUE, "budgets": BUDGETS, "draws": N_DRAWS, "variants": VARIANTS,
+                        "variability_levels": {k: {"amplitude_jitter": v[0], "tau_jitter": v[1],
+                                                   "drift_V": v[2]} for k, v in LEVELS.items()},
+                        "variability_note": "ASSUMED levels; no published pulse-to-pulse figures found",
                         "n_electrodes": n_el, "noise_uV": NOISE * 1e6, "fp_target_per_el_s": FP_TARGET,
                         "noise": "generated (white) -- replace with phantom noise when recorded",
-                        "waveforms": "parametric classes (recovery.WAVEFORMS), not digitized published templates"},
-           "split": split, "by_range": {}}
-import itertools
-for rng_mV, HP in itertools.product(RANGES_mV, HP_LIST):
-    sat_V = rng_mV * 1e-3
-    print(f"\n===== amplifier range +-{rng_mV} mV, high-pass {HP or 'off'} Hz =====")
-    rec_rng = np.random.default_rng(5)
-    data = {}
-    for p in range(N_PULSES):
-        sp, truth = pulses[p]
-        # after clipping, the high-pass carries a wrong tail for a few of its
-        # time constants: the clipped channel is unusable until it settles (3 tau)
-        rec_n = RECOVER if not HP else int(np.ceil(3 / (2 * np.pi * HP) / TS))
-        y, s = record(art_fine, sp, NOISE, sat_V, SUB, rec_n, rec_rng, hp_hz=HP)
-        data[p] = (y, ~s, noise_level(y, BASE), truth)
-    V, T = split["validation"], split["test"]
+                        "waveforms": "parametric classes (recovery.WAVEFORMS), not digitized published templates",
+                        "high_pass_basis": "300 Hz: Ronchi et al. 2019 report noise split at 300 Hz "
+                                           "(stated basis, not confirmation of the lab's setting)"},
+           "split": split, "by_condition": {}}
+draw_rng = np.random.default_rng(99)
+draws = {b: [sorted(draw_rng.choice(split["calibration"], b, replace=False).tolist())
+             for _ in range(N_DRAWS)] for b in BUDGETS}
+results["draws"] = draws
+V, T = split["validation"], split["test"]
+n_t = n
+Zp = fields[PROVISIONAL_VARIANT[0]]["transfer_ohm"][el] / PROVISIONAL_VARIANT[1]
+Rp = fields[PROVISIONAL_VARIANT[0]]["R_solution_ohm"] / PROVISIONAL_VARIANT[1]
+
+for HP, level in itertools.product(HP_LIST, LEVELS):
+    cond = f"HP {HP or 'off'} | variability {level}"
+    print(f"\n===== amplifier +-{RANGES_mV[0]} mV, high-pass {HP or 'off'} Hz, variability {level} =====",
+          flush=True)
+    data, truth_par = make_data(HP, level)
     def lists(ids, clean_fn):
-        """(cleaned, usable, noise, truth, instrument-usable) for the pulses
-        `ids`; methods may shrink `usable` (blanking), but SATURATION for
-        scoring always comes from the instrument mask (the last entry)."""
         return ([clean_fn(data[p][0], p) for p in ids], [data[p][1] for p in ids],
                 [data[p][2] for p in ids], [data[p][3] for p in ids], [data[p][1] for p in ids])
+    out = {"methods": {}, "physics_variants": {}, "diagnostics": {}, "truth_parameters": truth_par}
 
-    out = {"methods": {}, "physics_variants": {}, "diagnostics": {}}
-    # --- methods that need no calibration
-    for name, fn, umask in [("no correction", lambda y, p: y, None),
-                            ("blanking 1 ms + interpolation", lambda y, p: blank_interp(y, t_samp, 0, 1e-3)[0],
-                             (t_samp >= 0) & (t_samp < 1e-3))]:
+    def run_flat(name, fn, umask=None, extra=None):
         cv, uv, sv, tv, iv = lists(V, fn)
         if umask is not None:
             uv = [u & ~umask[None, :] for u in uv]
@@ -346,66 +420,140 @@ for rng_mV, HP in itertools.product(RANGES_mV, HP_LIST):
         ct, ut, st, tt, it = lists(T, fn)
         if umask is not None:
             ut = [u & ~umask[None, :] for u in ut]
-        r, *_ = evaluate(ct, ut, st, tt, it, k)
+        r, f, ev, lat, sat = evaluate(ct, ut, st, tt, it, k)
+        if extra:
+            r.update(extra)
         out["methods"][name] = {str(b): [r] for b in BUDGETS}       # budget-independent
-        print(f"{name:34s} k {k:4.1f}  recall(evoked <1 ms) {r['recall_evoked_0_1ms']}  "
-              f"earliest {r['earliest_recovery_ms']} ms  FP {r['fp_rate']:.2f}/el/s")
+        print(f"  {name:36s} k {k:4.1f}  recall(<1 ms) {r['recall_evoked_0_1ms']}  "
+              f"earliest {r['earliest_recovery_ms']}  FP {r['fp_rate']:.2f}/el/s", flush=True)
+        return r, f, ev, lat, sat
 
-    # --- calibrated methods, budget x draws
-    draw_rng = np.random.default_rng(99)
-    draws = {b: [sorted(draw_rng.choice(split["calibration"], b, replace=False).tolist())
-                 for _ in range(N_DRAWS)] for b in BUDGETS}
-    results["draws"] = draws
-    n_t = n
+    run_flat("no correction", lambda y, p: y)
+    run_flat("blanking 1 ms + interpolation", lambda y, p: blank_interp(y, t_samp, 0, 1e-3)[0],
+             (t_samp >= 0) & (t_samp < 1e-3))
+
+    # --- physics PER-PULSE (no calibration; provisional wrong model)
+    pp_cache = {p: physics_perpulse(data[p][0], data[p][1], Zp, Rp, HP) for p in V + T}
+    run_flat("physics per-pulse", lambda y, p: y - pp_cache[p][0],
+             extra={"dof": 3, "nominal_params": 3, "params_per_pulse": True})
+    # --- SALPA, the original implementation (step 28): per channel, no calibration
+    if salpa_available():
+        onset = int(round(-T0 / TS))
+        peg = (onset, int(np.ceil(2 * PHASE / TS)) + 1)        # the stimulus itself: 0 to 0.45 ms
+        for lab, fp in ((SALPA_LABEL, None), (SALPA_PEG_LABEL, peg)):
+            sc = {p: salpa_clean(data[p][0], data[p][1], data[p][2], SAT_V, seed=p, forcepeg=fp) for p in V + T}
+            cv = [sc[p][0] for p in V]; uv = [sc[p][1] for p in V]
+            sv = [data[p][2] for p in V]; tv = [data[p][3] for p in V]
+            k = calibrate_k(cv, uv, sv, tv)
+            r, *_ = evaluate([sc[p][0] for p in T], [sc[p][1] for p in T], [data[p][2] for p in T],
+                             [data[p][3] for p in T], [data[p][1] for p in T], k)
+            r.update({"parameters": dict(SALPA_DEFAULTS, forced_peg_samples=fp),
+                      "provenance": "PyPI salpa 1.0; github.com/wagenadl/salpa commit 8c06ce7; "
+                                    "GPL-3.0-or-later; installed, not copied"})
+            out["methods"][lab] = {str(b): [r] for b in BUDGETS}
+            print(f"  {lab:48s} k {k:4.1f}  recall(<1 ms) {r['recall_evoked_0_1ms']}  "
+                  f"earliest {r['earliest_recovery_ms']}  FP {r['fp_rate']:.2f}/el/s", flush=True)
+    elif level == list(LEVELS)[0]:
+        print("  SALPA arm SKIPPED: the original package is not installed (pip install salpa; "
+              "needs Python >= 3.12)")
+
+    # spike-absorption check (step 22): same test pulses without spikes
+    nospk, _ = make_data(HP, level, with_spikes=False, ids=T)
+    with_p = np.array([[*pp_cache[p][1], pp_cache[p][2]] for p in T])
+    without_fits = {p: physics_perpulse(nospk[p][0], nospk[p][1], Zp, Rp, HP) for p in T}
+    without_p = np.array([[*without_fits[p][1], without_fits[p][2]] for p in T])
+    shift = np.abs(with_p - without_p).mean(0)
+    spread = with_p.std(0, ddof=1)
+    names = ["alpha (scale)", "beta (offset)", "C (time constant)"]
+    absorb = {nm: {"mean_abs_shift": float(s_), "pulse_to_pulse_sd": float(sd),
+                   "shift_over_spread": float(s_ / sd) if sd > 0 else None,
+                   "shift_rel_to_value": float(s_ / abs(with_p[:, i].mean()))}
+              for i, (nm, s_, sd) in enumerate(zip(names, shift, spread))}
+    out["spike_absorption_check"] = absorb
+    print("  spike-absorption check (per-pulse physics): " + "; ".join(
+        f"{nm.split()[0]} shift {v['shift_rel_to_value']*100:.3f}% of value"
+        + (f" = {v['shift_over_spread']:.2f} x pulse-to-pulse SD" if v["shift_over_spread"] is not None else "")
+        for nm, v in absorb.items()), flush=True)
+
+    # --- per-pulse physics, stress-test variants (variability none only)
+    variants = VARIANTS if level == "none" else [PROVISIONAL_VARIANT]
+    if level == "none":
+        for var in VARIANTS:
+            ret, sf, z1k = var
+            if var == PROVISIONAL_VARIANT:
+                continue
+            Zh = fields[ret]["transfer_ohm"][el] / sf; Rh = fields[ret]["R_solution_ohm"] / sf
+            cache = {p: physics_perpulse(data[p][0], data[p][1], Zh, Rh, HP)[0] for p in V + T}
+            cv, uv, sv, tv, iv = lists(V, lambda y, p: y - cache[p])
+            k = calibrate_k(cv, uv, sv, tv)
+            r, *_ = evaluate(*lists(T, lambda y, p: y - cache[p]), k)
+            key = f"physics per-pulse | {ret}, sigma x{sf}, {z1k/1e3:.0f} kOhm"
+            out["physics_variants"][key] = {str(b): [r] for b in BUDGETS}
+        out["physics_variants"][f"physics per-pulse | {PROVISIONAL_VARIANT[0]}, sigma x{PROVISIONAL_VARIANT[1]}, "
+                                f"{PROVISIONAL_VARIANT[2]/1e3:.0f} kOhm"] = out["methods"]["physics per-pulse"]
+
+    # --- calibrated arms, budget x draws
     for b in BUDGETS:
         for d_i, cal in enumerate(draws[b]):
-            M = np.mean([data[p][0] for p in cal], axis=0)
-            U_all = np.all([data[p][1] for p in cal], axis=0)
-            # per-channel average template
+            # calibration mean over the pulses in which each sample was usable
+            # (a sample clipped in one calibration pulse still uses the others);
+            # never-usable samples get 0 and are excluded from fits (U_any)
+            Ys = np.array([data[p][0] for p in cal]); Us = np.array([data[p][1] for p in cal])
+            cnt = Us.sum(0)
+            U_all = cnt > 0
+            M = np.where(U_all, (Ys * Us).sum(0) / np.maximum(cnt, 1), 0.0)
             tmpl = M.copy()
             cv, uv, sv, tv, iv = lists(V, lambda y, p: y - tmpl)
             k = calibrate_k(cv, uv, sv, tv)
             r, *_ = evaluate(*lists(T, lambda y, p: y - tmpl), k)
             r["dof"] = n_el * n_t; r["nominal_params"] = n_el * n_t
             out["methods"].setdefault("per-channel average", {}).setdefault(str(b), []).append(r)
-            # low-rank: rank sweep on validation
-            best = None
-            for rk in range(1, 21):
-                Mr = lowrank(np.where(U_all, M, 0.0), rk)
-                cv, uv, sv, tv, iv = lists(V, lambda y, p: y - Mr)
-                kk = calibrate_k(cv, uv, sv, tv)
-                rv, *_ = evaluate(cv, uv, sv, tv, iv, kk)
-                score_v = rv["recall_evoked_0_1ms"] or 0.0
-                if best is None or score_v > best[0]:
-                    best = (score_v, rk, kk, Mr)
-            _, rk, kk, Mr = best
-            r, *_ = evaluate(*lists(T, lambda y, p: y - Mr), kk)
-            r["rank"] = rk; r["dof"] = rk * (n_el + n_t - rk); r["nominal_params"] = rk * (n_el + n_t - rk)
-            out["methods"].setdefault("low-rank empirical (best rank)", {}).setdefault(str(b), []).append(r)
-            # physics variants: fitted to the mean of the calibration pulses
-            # (the artifact is the same every pulse; averaging only lowers noise)
-            for var in VARIANTS:
+            # low-rank, fixed and per-pulse: rank chosen on validation for each
+            Uf, sf_, Vtf = np.linalg.svd(M, full_matrices=False)
+            for arm in ("low-rank fixed", "low-rank per-pulse"):
+                best = None
+                for rk in range(1, 21):
+                    if arm == "low-rank fixed":
+                        Mr = (Uf[:, :rk] * sf_[:rk]) @ Vtf[:rk]
+                        fn = lambda y, p, Mr=Mr: y - Mr
+                    else:
+                        Ur = Uf[:, :rk]
+                        fn = lambda y, p, Ur=Ur: y - perpulse_project(y, data[p][1], Ur)
+                    cv, uv, sv, tv, iv = lists(V, fn)
+                    kk = calibrate_k(cv, uv, sv, tv)
+                    rv, *_ = evaluate(cv, uv, sv, tv, iv, kk)
+                    sc = rv["recall_evoked_0_1ms"] or 0.0
+                    if best is None or sc > best[0]:
+                        best = (sc, rk, kk, fn)
+                _, rk, kk, fn = best
+                r, *_ = evaluate(*lists(T, fn), kk)
+                r["rank"] = rk
+                r["dof"] = rk * (n_el + n_t - rk) if arm == "low-rank fixed" else rk * n_el + rk * n_t
+                r["nominal_params"] = r["dof"]
+                out["methods"].setdefault(arm, {}).setdefault(str(b), []).append(r)
+            # physics fixed (provisional; all variants at level none)
+            for var in variants:
                 ret, sf, z1k = var
                 Zh = fields[ret]["transfer_ohm"][el] / sf
                 Rh = fields[ret]["R_solution_ohm"] / sf
-                for arm, off in [("physics (scale, tau)", False), ("physics + offset", True)]:
+                for arm, off in [("physics fixed, scale + tau only", False), ("physics fixed", True)]:
                     model, coef, C = fit_physics(M, U_all, Zh, Rh, C_GRID, t_fine - T0, -T0, SUB,
-                                                 PHASE, window=WIN, offset=off, hp_hz=HP)
+                                                 PHASE, window=WIN, offset=off, hp_hz=HP, refine=True)
                     tmpl = model
                     cv, uv, sv, tv, iv = lists(V, lambda y, p: y - tmpl)
                     k = calibrate_k(cv, uv, sv, tv)
                     r, f, ev, lat, sat = evaluate(*lists(T, lambda y, p: y - tmpl), k)
                     r["C_fit_nF"] = C * 1e9; r["coef"] = list(map(float, coef))
-                    r["dof"] = (2 if off else 1) + 1; r["nominal_params"] = (2 if off else 1) + 1
+                    r["dof"] = (2 if off else 1) + 1; r["nominal_params"] = r["dof"]
                     key = f"{arm} | {ret}, sigma x{sf}, {z1k/1e3:.0f} kOhm"
                     out["physics_variants"].setdefault(key, {}).setdefault(str(b), []).append(r)
                     if var == PROVISIONAL_VARIANT:
                         out["methods"].setdefault(arm, {}).setdefault(str(b), []).append(r)
-                    if b == BUDGETS[-1] and d_i == 0:
+                    if b == BUDGETS[-1] and d_i == 0 and off:
                         be = out["methods"]["blanking 1 ms + interpolation"][str(b)][0]["earliest_recovery_ms"]
                         out["diagnostics"][key] = _diagnose(tmpl, C, Rh, Zh, T, data, f, ev, sat, r, be)
-        print(f"budget {b:2d}: done ({time.time()-t_start:.0f} s)")
-    results["by_range"][f"{rng_mV} mV, HP {HP or 'off'}"] = out
+        print(f"  budget {b:2d}: done ({time.time()-t_start:.0f} s)", flush=True)
+    results["by_condition"][cond] = out
 
 # ------------------------------------------------------------------ summary
 def med_iqr(vals):
@@ -415,75 +563,99 @@ def med_iqr(vals):
     return float(np.median(v)), float(np.percentile(v, 25)), float(np.percentile(v, 75))
 
 ORDER = ["no correction", "blanking 1 ms + interpolation", "per-channel average",
-         "low-rank empirical (best rank)", "physics (scale, tau)", "physics + offset"]
+         "low-rank fixed", "low-rank per-pulse", "physics fixed", "physics per-pulse", SALPA_LABEL,
+         SALPA_PEG_LABEL, "physics fixed, scale + tau only"]
 COLORS = {"no correction": "0.6", "blanking 1 ms + interpolation": "#eb6834",
-          "per-channel average": "#1baf7a", "low-rank empirical (best rank)": "#7b4fd0",
-          "physics (scale, tau)": "#2a78d6", "physics + offset": "#111111"}
-summary = {"settings": results["settings"], "split": split, "by_range": {}}
-for rng_key, out in results["by_range"].items():
-    print(f"\n===== {rng_key}: recall of evoked spikes < 1 ms after the pulse, at "
-          f"<= {FP_TARGET:g} false/el/s (median [IQR] over {N_DRAWS} draws); physics = provisional "
-          f"model {PROVISIONAL_VARIANT}")
-    print(f"{'method':32s} " + " ".join(f"{'b=' + str(b):>17s}" for b in BUDGETS))
+          "per-channel average": "#1baf7a", "low-rank fixed": "#7b4fd0", "low-rank per-pulse": "#c084fc",
+          "physics fixed": "#111111", "physics per-pulse": "#2a78d6",
+          "physics fixed, scale + tau only": "#9ca3af", SALPA_LABEL: "#c2410c", SALPA_PEG_LABEL: "#f59e0b"}
+STYLE = {"low-rank per-pulse": "--", "physics per-pulse": "--", "physics fixed, scale + tau only": ":",
+         SALPA_LABEL: "-.", SALPA_PEG_LABEL: "-."}
+summary = {"settings": results["settings"], "split": split, "by_condition": {}}
+for cond, out in results["by_condition"].items():
     S = {}
-    for m in ORDER:
-        row, S[m] = [], {}
+    print(f"\n===== {cond}: recall of evoked spikes < 1 ms, at <= {FP_TARGET:g} false/el/s "
+          f"(median [IQR] over {N_DRAWS} draws)")
+    print(f"{'arm':48s} " + " ".join(f"{'b=' + str(b):>17s}" for b in BUDGETS) + "  earliest(b=max)")
+    for m in ORDER + [k for k in out["methods"] if k not in ORDER]:
+        if m not in out["methods"]:
+            continue
+        S[m], row = {}, []
         for b in BUDGETS:
             rs = out["methods"][m][str(b)]
             md, lo, hi = med_iqr([r["recall_evoked_0_1ms"] for r in rs])
-            ea = med_iqr([r["earliest_recovery_ms"] for r in rs])[0]
-            S[m][str(b)] = {"recall_median": md, "recall_iqr": [lo, hi], "earliest_median_ms": ea,
-                            "fraction_draws_recall_ge_0.9": float(np.mean([(r["recall_evoked_0_1ms"] or 0) >= 0.9 for r in rs])),
+            S[m][str(b)] = {"recall_median": md, "recall_iqr": [lo, hi],
+                            "earliest_median_ms": med_iqr([r["earliest_recovery_ms"] for r in rs])[0],
+                            "fraction_draws_recall_ge_0.9": float(np.mean([(r["recall_evoked_0_1ms"] or 0) >= 0.9
+                                                                          for r in rs])),
                             "dof_median": med_iqr([r.get("dof", 0) for r in rs])[0],
-                            "rank_median": med_iqr([r.get("rank") for r in rs])[0] if m.startswith("low") else None}
+                            "rank_median": med_iqr([r.get("rank") for r in rs])[0]}
             row.append(f"{md:.2f} [{lo:.2f},{hi:.2f}]" if md is not None else "-")
-        first = next((b for b in BUDGETS if (S[m][str(b)]["recall_median"] or 0) >= 0.9), None)
-        S[m]["first_budget_median_recall_ge_0.9"] = first
-        print(f"{m:32s} " + " ".join(f"{c:>17s}" for c in row) + f"   reaches 0.9 at b = {first}")
-    print("earliest recovery time (median ms over draws):")
-    for m in ORDER:
-        print(f"  {m:32s} " + " ".join(f"{str(S[m][str(b)]['earliest_median_ms']):>6s}" for b in BUDGETS))
-    print("effective degrees of freedom (median):  " + "; ".join(
-        f"{m}: {S[m][str(BUDGETS[-1])]['dof_median']:.0f}" for m in ORDER[2:]))
-    print(f"physics variants (model error stress test), recall < 1 ms at b = {BUDGETS[0]} and {BUDGETS[-1]}:")
+        S[m]["first_budget_median_recall_ge_0.9"] = next(
+            (b for b in BUDGETS if (S[m][str(b)]["recall_median"] or 0) >= 0.9), None)
+        print(f"{m:48s} " + " ".join(f"{c:>17s}" for c in row)
+              + f"  {S[m][str(BUDGETS[-1])]['earliest_median_ms']}")
+    adv = {}
+    for pair, (ph, em) in {"fixed vs fixed": ("physics fixed", "low-rank fixed"),
+                           "per-pulse vs per-pulse": ("physics per-pulse", "low-rank per-pulse")}.items():
+        adv[pair] = {str(b): (S[ph][str(b)]["recall_median"] or 0) - (S[em][str(b)]["recall_median"] or 0)
+                     for b in BUDGETS}
+        print(f"  physics advantage, {pair}: " + ", ".join(f"b={b} {adv[pair][str(b)]:+.2f}" for b in BUDGETS))
+    for lab in (SALPA_LABEL, SALPA_PEG_LABEL):
+        if lab in S:
+            print(f"  physics per-pulse minus {lab}: "
+                  f"{(S['physics per-pulse'][str(BUDGETS[0])]['recall_median'] or 0) - (S[lab][str(BUDGETS[0])]['recall_median'] or 0):+.2f}")
+    print("  spike absorption: " + "; ".join(f"{k.split()[0]} {v['shift_over_spread']:.2f} x SD"
+                                              for k, v in out["spike_absorption_check"].items()
+                                              if v["shift_over_spread"] is not None))
     PV = {}
     for key, byb in out["physics_variants"].items():
         a = med_iqr([r["recall_evoked_0_1ms"] for r in byb[str(BUDGETS[0])]])[0]
         z = med_iqr([r["recall_evoked_0_1ms"] for r in byb[str(BUDGETS[-1])]])[0]
-        dg = out["diagnostics"].get(key, {})
-        PV[key] = {"recall_b_min": a, "recall_b_max": z, "diagnosis": dg}
-        print(f"  {key:62s} {a:.2f} -> {z:.2f}   {dg.get('attribution', '')}")
-    counts = {}
-    for dg in out["diagnostics"].values():
-        counts[dg["attribution"]] = counts.get(dg["attribution"], 0) + 1
-    print("failure attribution counts:", counts)
-    summary["by_range"][rng_key] = {"methods": S, "physics_variants": PV, "attribution_counts": counts,
-                                    "no_calibration_methods": {m: out["methods"][m][str(BUDGETS[0])][0]
-                                                               for m in ORDER[:2]}}
-    # figure: recall vs budget
-    fig, axs = plt.subplots(1, 2, figsize=(12, 4.3), layout="constrained")
-    for m in ORDER:
-        md = [S[m][str(b)]["recall_median"] for b in BUDGETS]
-        lo = [S[m][str(b)]["recall_iqr"][0] for b in BUDGETS]
-        hi = [S[m][str(b)]["recall_iqr"][1] for b in BUDGETS]
-        axs[0].plot(BUDGETS, [np.nan if v is None else v for v in md], "o-", color=COLORS[m], lw=2, label=m)
-        if None not in lo + hi:
-            axs[0].fill_between(BUDGETS, lo, hi, color=COLORS[m], alpha=0.12, lw=0)
-        ea = [S[m][str(b)]["earliest_median_ms"] for b in BUDGETS]
-        axs[1].plot(BUDGETS, [np.nan if e is None else e for e in ea], "o-", color=COLORS[m], lw=2)
-    axs[0].axhline(0.9, color="0.5", lw=1, ls="--")
-    axs[0].set_xscale("log"); axs[0].set_xticks(BUDGETS); axs[0].set_xticklabels(BUDGETS)
-    axs[0].set_xlabel("calibration pulses"); axs[0].set_ylabel("evoked spikes found, < 1 ms after pulse")
-    axs[0].set_title(f"recall at <= {FP_TARGET:g} false detections /el/s (median, IQR over draws)", fontsize=9.5)
-    axs[0].legend(frameon=False, fontsize=8); axs[0].set_ylim(-0.02, 1.02)
-    axs[1].set_xscale("log"); axs[1].set_xticks(BUDGETS); axs[1].set_xticklabels(BUDGETS)
-    axs[1].set_xlabel("calibration pulses"); axs[1].set_ylabel("earliest recovery time (ms)")
-    axs[1].set_title("earliest delay bin from which every bin passes (90% found, <= 5% false)", fontsize=9.5)
-    for ax in axs:
-        ax.grid(True, color="0.92", lw=0.5)
-    fig.suptitle(f"Aim 2 calibration budget, amplifier +-{rng_key}; synthetic (generated noise)"
-                 + (" -- QUICK" if QUICK else ""))
-    fig.savefig(FIG / f"budget_{rng_key.replace(' ', '').replace(',', '_')}.png", dpi=200)
+        PV[key] = {"recall_b_min": a, "recall_b_max": z, "diagnosis": out["diagnostics"].get(key, {})}
+    if len(PV) > 2:
+        print("  model-error stress test (recall at b=min -> b=max; diagnosis):")
+        for key, v in PV.items():
+            print(f"    {key:66s} {v['recall_b_min']:.2f} -> {v['recall_b_max']:.2f}  "
+                  f"{v['diagnosis'].get('attribution', '')}")
+    summary["by_condition"][cond] = {"methods": S, "physics_advantage": adv, "physics_variants": PV,
+                                     "spike_absorption_check": out["spike_absorption_check"]}
+
+# where does the physics advantage disappear? (step 27)
+summary["advantage_disappears_at"] = {}
+for HP in HP_LIST:
+    for pair in ("fixed vs fixed", "per-pulse vs per-pulse"):
+        lv = None
+        for level in LEVELS:
+            a = summary["by_condition"][f"HP {HP or 'off'} | variability {level}"]["physics_advantage"][pair]
+            if all(v <= 0 for v in a.values()):
+                lv = level; break
+        summary["advantage_disappears_at"][f"HP {HP or 'off'} | {pair}"] = lv
+        print(f"physics advantage ({pair}, HP {HP or 'off'}) disappears at variability: {lv or 'not within the sweep'}")
+
+# figures: one per filter setting, one panel per variability level
+for HP in HP_LIST:
+    fig, axs = plt.subplots(1, len(LEVELS), figsize=(4.6 * len(LEVELS), 4.4), sharey=True, layout="constrained")
+    axs = np.atleast_1d(axs)
+    for ax, level in zip(axs, LEVELS):
+        S = summary["by_condition"][f"HP {HP or 'off'} | variability {level}"]["methods"]
+        for m in ORDER:
+            if m not in S:
+                continue
+            md = [S[m][str(b)]["recall_median"] for b in BUDGETS]
+            ax.plot(BUDGETS, [np.nan if v is None else v for v in md], STYLE.get(m, "-"), marker="o", ms=3.5,
+                    color=COLORS[m], lw=2, label=m)
+        ax.axhline(0.9, color="0.5", lw=0.8, ls="--")
+        ax.set_xscale("log"); ax.set_xticks(BUDGETS); ax.set_xticklabels(BUDGETS)
+        a_j, c_j, d_v = LEVELS[level]
+        ax.set_title(f"variability {level}: amp {a_j*100:.0f}%, tau {c_j*100:.0f}%, drift {d_v*1e6:.0f} uV",
+                     fontsize=9)
+        ax.set_xlabel("calibration pulses"); ax.grid(True, color="0.92", lw=0.5)
+    axs[0].set_ylabel(f"evoked spikes found < 1 ms (<= {FP_TARGET:g} false/el/s)")
+    axs[0].legend(frameon=False, fontsize=7.5); axs[0].set_ylim(-0.02, 1.02)
+    fig.suptitle(f"Aim 2: recall vs calibration budget, high-pass {HP or 'off'} Hz, +-{RANGES_mV[0]} mV; "
+                 f"synthetic, generated noise" + (" -- QUICK" if QUICK else ""))
+    fig.savefig(FIG / f"budget_variability_HP{HP or 'off'}.png", dpi=180)
     plt.close(fig)
 
 (OUT / "summary.json").write_text(json.dumps(summary, indent=2, default=float))

@@ -132,18 +132,20 @@ def harmonic_basis(x, y, order=2):
 
 
 def fit_physics(y, usable, Zhat, R_sol, C_grid, t_fine_s, t_on_s, sub, phase_s=200e-6,
-                window=None, offset=True, extra=None, hp_hz=None):
+                window=None, offset=True, extra=None, hp_hz=None, refine=False):
     """Fit artifact = (alpha * Zhat_k + beta + sum_j gamma_j B_jk) * <i(t; C)>_bin
     by least squares over all usable samples of all electrodes in `window`;
-    C (with R_sol it sets the time constant) by search over C_grid. Two
+    C (with R_sol it sets the time constant) by search over C_grid, and, if
+    refine=True, then by a bounded 1-D minimization between the neighbouring
+    grid points (needed when tau varies by less than the grid step). Two
     passes: the second ignores samples with large residuals (spikes).
     offset=False drops beta. extra: (n_electrodes, k) further spatial shapes,
     e.g. harmonic_basis(...) (if given, it should not repeat the constant)."""
     if window is None:
         window = np.ones(y.shape[1], dtype=bool)
     m = usable & window[None, :]
-    best = None
-    for C in C_grid:
+
+    def at(C):
         ib = unit_current_binned(R_sol, C, t_fine_s, t_on_s, sub, phase_s, hp_hz)
         basis = [Zhat[:, None] * ib[None, :]]
         if offset:
@@ -158,10 +160,21 @@ def fit_physics(y, usable, Zhat, R_sol, C_grid, t_fine_s, t_on_s, sub, phase_s=2
             res = y - model
             s = np.median(np.abs(res[m])) / 0.6745 + 1e-30
             keep = m & (np.abs(res) < 4 * s)
-        sse = np.sum(res[keep] ** 2) / max(keep.sum(), 1)
-        if best is None or sse < best[0]:
-            best = (sse, coef, C, model)
-    _, coef, C, model = best
+        return np.sum(res[keep] ** 2) / max(keep.sum(), 1), coef, model
+
+    C_grid = np.asarray(C_grid, float)
+    vals = [at(C) for C in C_grid]
+    i = int(np.argmin([v[0] for v in vals]))
+    sse, coef, model = vals[i]
+    C = C_grid[i]
+    if refine and len(C_grid) > 2:
+        from scipy.optimize import minimize_scalar
+        lo, hi = np.log(C_grid[max(i - 1, 0)]), np.log(C_grid[min(i + 1, len(C_grid) - 1)])
+        r = minimize_scalar(lambda lc: at(np.exp(lc))[0], bounds=(lo, hi), method="bounded",
+                            options={"xatol": 1e-4})
+        s2, c2, m2 = at(np.exp(r.x))
+        if s2 <= sse:
+            sse, coef, model, C = s2, c2, m2, float(np.exp(r.x))
     return model, coef, C
 
 
@@ -271,3 +284,67 @@ def blank_interp(y, t_samp, t0, t1):
         w = (t_samp[idx] - t_samp[a]) / max(t_samp[b] - t_samp[a], 1e-30)
         out[:, idx] = y[:, [a]] * (1 - w) + y[:, [b]] * w
     return out, m
+
+
+# ---------------------------------------------------------------------------
+# SALPA (plan v16 step 28): the ORIGINAL implementation, used directly
+# ---------------------------------------------------------------------------
+# Provenance: Daniel A. Wagenaar's own code -- PyPI package `salpa` 1.0 (a
+# pybind11 wrapper compiled from the author's C++ LocalFit, originally part of
+# MEABench), repository https://github.com/wagenadl/salpa (commit 8c06ce7,
+# 2026-06-28), licence GPL-3.0-or-later. It is INSTALLED as a dependency
+# (`pip install salpa`), not copied into this repository. Reference: Wagenaar
+# & Potter (2002), J. Neurosci. Methods 120, 113-120.
+# Parameters: the author's command-line defaults from src/salpa.cpp:
+# tau (half-width) 3 ms, blank-depeg 20 samples, look-ahead 5 samples,
+# asymmetry (chi2) window 10 samples, threshold 3 x the channel's noise SD.
+# (The Python wrapper's own defaults differ -- 5, 5, 15 samples; the
+# documented command-line tool's defaults are used.) Saturated samples are
+# set to the rail, as a saturated amplifier reports them, and the rails are
+# the amplifier range, so SALPA sees the same saturation information as every
+# other arm. Samples SALPA blanks come back as NaN and are marked unusable.
+SALPA_DEFAULTS = {"tau_ms": 3.0, "t_blankdepeg": 20, "t_ahead": 5, "t_chi2": 10, "thresh_std": 3.0}
+SALPA_LABEL = "SALPA (original implementation)"
+SALPA_PEG_LABEL = "SALPA (original), forced peg over the stimulus"
+
+
+def salpa_available():
+    try:
+        import salpa  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+SALPA_PAD = 200            # samples of baseline before and after each snippet (10 ms at 20 kHz)
+
+
+def salpa_clean(y, usable, sigma, sat_V, fs=FS, seed=0, forcepeg=None):
+    """Run the original SALPA on every channel of one pulse. Returns
+    (cleaned, usable_after).
+
+    SALPA processes continuous recordings and needs ~4 tau of history before
+    it produces output. The synthetic traces are 6 ms snippets, so each is
+    embedded in GENERATED baseline noise (the channel's own noise level,
+    10 ms before and after), standing in for the surrounding continuous
+    recording. The padding carries no information about the artifact.
+    forcepeg: (first_sample, n_samples) of the stimulus within the snippet --
+    the original tool's forced peg at known stimulus times (-p/-d/-f); None =
+    the author's pure defaults (no forced peg)."""
+    from salpa import salpa as _salpa
+    tau = int(round(SALPA_DEFAULTS["tau_ms"] * 1e-3 * fs))
+    rng = np.random.default_rng(seed)
+    out = np.empty_like(y)
+    for k in range(y.shape[0]):
+        x = np.array(y[k], dtype=np.float64)
+        x[~usable[k]] = sat_V                       # a saturated amplifier sits on its rail
+        pad = lambda: rng.normal(0, float(sigma[k]), SALPA_PAD)
+        xx = np.concatenate([pad(), x, pad()])
+        kw = {} if forcepeg is None else {"tt_stimuli": [SALPA_PAD + forcepeg[0]], "t_forcepeg": forcepeg[1]}
+        yy = _salpa(xx, tau, rail1=-0.999 * sat_V, rail2=0.999 * sat_V,
+                    thresh=SALPA_DEFAULTS["thresh_std"] * float(sigma[k]),
+                    t_blankdepeg=SALPA_DEFAULTS["t_blankdepeg"], t_ahead=SALPA_DEFAULTS["t_ahead"],
+                    t_chi2=SALPA_DEFAULTS["t_chi2"], **kw)
+        out[k] = yy[SALPA_PAD:SALPA_PAD + len(x)]
+    ok = np.isfinite(out) & usable
+    return np.where(np.isfinite(out), out, 0.0), ok

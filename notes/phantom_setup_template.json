@@ -1,5 +1,5 @@
 {
-  "_comment": "Part 6/7 phantom geometry. Units: mm, S/m, A. Edit to match the apparatus BEFORE committing predictions. Fields marked ASSUMED are not in research plan v13 and are guesses.",
+  "_comment": "Part 6/7 phantom geometry (research plan v16). Units: mm, S/m, A. Replace every value marked ASSUMED with the measured one BEFORE committing predictions.",
   "part6": {
     "tank_inside_mm": [
       300.0,
@@ -26,6 +26,15 @@
       60.0
     ],
     "return_wire_diameter_mm": 0.5,
+    "reference_xy_mm": [
+      20.0,
+      190.0
+    ],
+    "reference_position_uncertainty_mm": 1.0,
+    "reference_exposed_z_mm": [
+      49.5,
+      50.5
+    ],
     "recording_direction_xy": [
       0.0,
       1.0
@@ -52,11 +61,6 @@
     "current_nominal_A": [
       5e-05,
       0.0001
-    ],
-    "alt_reference_xyz_mm": [
-      20.0,
-      190.0,
-      50.0
     ]
   },
   "part7": {
@@ -82,29 +86,37 @@
     "stim_tip_length_mm": 1.0,
     "stim_wire_diameter_mm": 0.5,
     "return_position_mm": [
-      -65.0,
+      -66.0,
+      0.0,
+      -12.0
+    ],
+    "return_exposed_length_mm": 5.0,
+    "traverse_direction": [
+      -1.0,
       0.0,
       0.0
     ],
-    "return_exposed_length_mm": 5.0,
-    "recording_radius_mm": 72.0,
-    "recording_layout": "icosahedron",
-    "line_positions_mm": [
-      20,
+    "traverse_distances_mm": [
+      5,
+      15,
       25,
       30,
       35,
-      38,
-      42,
+      37.5,
+      42.5,
       45,
       50,
       55,
       60,
-      65,
-      70
+      65
     ],
+    "position_uncertainty_mm": 0.1,
+    "voltage_noise_V": 5e-06,
     "sigma_in_nominal_S_per_m": 2.9,
     "sigma_out_nominal_S_per_m": 0.8,
-    "_note": "Plan v13 step 65 puts the return electrode OUTSIDE the outer container. If the container wall is insulating, no current can reach it -- the return must be inside the saline. Default here: inside, near the wall opposite the stimulating offset. Confirm before committing."
+    "current_nominal_A": [
+      5e-05,
+      0.0001
+    ]
   }
 }

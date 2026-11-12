@@ -10,13 +10,22 @@ PART 6 -- uniform tank
   insulating block on the tank floor, centred under the electrode. Current
   mode: the 100 kOhm series resistor sets the current, so the disk is a
   floating conductor carrying I. The return wire (exposed length L_ret) is
-  held at 0 V and is the oscilloscope ground, so every reading is
-  phi(recording tip) - phi(return).
+  held at 0 V. Every position is recorded under two referencing conditions
+  (plan v16 steps 53-54):
+    A  scope ground at the return:      V_A = phi(tip) - phi(return)
+    B  scope ground at a far reference: V_B = phi(tip) - phi(reference wire)
+  so V_A - V_B = phi(reference) - phi(return): ONE number, the same at every
+  position -- the phantom's measurement of the return-path term.
 
-PART 7 -- two-conductivity phantom
+PART 7 -- two-conductivity phantom (plan v16 steps 65-68)
   An agar sphere (sigma_in) inside a spherical container of saline (sigma_out),
   the container wall insulating. Stimulating tip inside the agar at an offset;
-  recording tips at 12 positions over the outer surface.
+  return wire INSIDE the saline near the wall; recording tips along a straight
+  traverse through the agar centre, away from the stimulating electrode,
+  crossing the interface perpendicular to it. The headline observable is the
+  gradient ratio across the interface (fd_ratio), computed from the same
+  points and differences as the measurement, beside the ideal ratio
+  sigma_out / sigma_in.
 
 What is predicted (and committed before measuring)
   The GEOMETRIC FACTOR  G = phi * sigma / I  (units 1/m) at every recording
@@ -59,46 +68,53 @@ um = 1e-6
 # are marked ASSUMED and must be checked against the built apparatus
 # ---------------------------------------------------------------------------
 DEFAULT_SETUP = {
-    "_comment": "Part 6/7 phantom geometry. Units: mm, S/m, A. Edit to match the "
-                "apparatus BEFORE committing predictions. Fields marked ASSUMED are "
-                "not in research plan v13 and are guesses.",
+    "_comment": "Part 6/7 phantom geometry (research plan v16). Units: mm, S/m, A. Replace "
+                "every value marked ASSUMED with the measured one BEFORE committing predictions.",
     "part6": {
-        "tank_inside_mm": [300.0, 200.0, 150.0],          # plan v13 (L x W x H)
+        "tank_inside_mm": [300.0, 200.0, 150.0],          # plan (L x W x H); measure (step 44)
         "fill_depth_mm": 100.0,                           # 6.00 L / (300 x 200 mm) = 100 mm
         "stim_xy_mm": [150.0, 100.0],                     # ASSUMED: centre of the floor
-        "stim_disk_diameter_mm": 0.50,                    # plan v13: 0.50 mm wire, cut flush
+        "stim_disk_diameter_mm": 0.50,                    # plan: 0.50 mm wire, cut flush
         "plate_mm": [60.0, 60.0, 5.0],                    # ASSUMED: printed plate L x W x thickness
         "return_xy_mm": [290.0, 100.0],                   # ASSUMED: 10 mm from one end wall, mid-width
         "return_exposed_z_mm": [40.0, 60.0],              # plan: 20 mm exposed; ASSUMED height
         "return_wire_diameter_mm": 0.50,
+        "reference_xy_mm": [20.0, 190.0],                 # ASSUMED: far reference wire (step 54)
+        "reference_position_uncertainty_mm": 1.0,         # ASSUMED: reference placed by ruler
+        "reference_exposed_z_mm": [49.5, 50.5],           # ASSUMED: 1 mm exposed tip at mid-depth
         "recording_direction_xy": [0.0, 1.0],             # ASSUMED: line across the tank (+y)
-        "recording_distances_mm": [1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 15.0, 20.0],  # plan v13
+        "recording_distances_mm": [1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 15.0, 20.0],  # plan
         "recording_tip_z_mm": [0.5, 1.5],                 # ASSUMED: exposed tip 1 mm, 0.5 mm above plate
-        "position_uncertainty_mm": 0.10,                  # ASSUMED: lid hole + calipers
+        "position_uncertainty_mm": 0.10,                  # plan v15
         "tip_height_uncertainty_mm": 0.25,                # ASSUMED
         "sigma_nominal_S_per_m": 1.55,                    # ~9 g/L NaCl near 22 C; measured on the day
-        "current_nominal_A": [50e-6, 100e-6],             # plan v13
-        "alt_reference_xyz_mm": [20.0, 190.0, 50.0],      # SUGGESTED separate reference wire tip
+        "current_nominal_A": [50e-6, 100e-6],             # plan
     },
     "part7": {
-        "container_inner_diameter_mm": 150.0,             # plan v13
-        "agar_diameter_mm": 80.0,                         # plan v13 (mold)
-        "agar_centre_offset_mm": [0.0, 0.0, 0.0],         # measured on the day (step 62)
-        "stim_offsets_mm": [[15.0, 0.0, 0.0], [25.0, 0.0, 0.0]],  # ASSUMED: two positions inside agar
+        "container_inner_diameter_mm": 150.0,             # plan
+        "agar_diameter_mm": 80.0,                         # plan (mold); measured (step 63)
+        "agar_centre_offset_mm": [0.0, 0.0, 0.0],         # measured on the day (step 63)
+        "stim_offsets_mm": [[15.0, 0.0, 0.0], [25.0, 0.0, 0.0]],  # ASSUMED: two positions in the agar
         "stim_tip_length_mm": 1.0, "stim_wire_diameter_mm": 0.50,
-        "return_position_mm": [-65.0, 0.0, 0.0],          # ASSUMED -- see note
-        "return_exposed_length_mm": 5.0,
-        "recording_radius_mm": 72.0,                      # ASSUMED: 3 mm inside the wall
-        "recording_layout": "icosahedron",                # 12 positions over the surface
-        "line_positions_mm": [20, 25, 30, 35, 38, 42, 45, 50, 55, 60, 65, 70],  # SUGGESTED: line
-                                                          # along +x crossing the agar boundary,
-        "line_z_offset_mm": 5.0,                          # 5 mm above the stimulating tip's level
-        "sigma_in_nominal_S_per_m": 2.9,                  # ~18 g/L NaCl agar; measured on the day
-        "sigma_out_nominal_S_per_m": 0.80,                # ~4.5 g/L NaCl; measured on the day
-        "_note": "Plan v13 step 65 puts the return electrode OUTSIDE the outer container. "
-                 "If the container wall is insulating, no current can reach it -- the return "
-                 "must be inside the saline. Default here: inside, near the wall opposite the "
-                 "stimulating offset. Confirm before committing.",
+        "return_position_mm": [-66.0, 0.0, -12.0],        # ASSUMED: INSIDE the saline near the wall
+                                                          # (step 67), BEYOND the far end of the
+                                                          # traverse and just below its line, so the
+                                                          # current crosses the interface along it.
+                                                          # Off to the side (e.g. [0, 65, 0]) the
+                                                          # traverse sees ~15x less signal.
+        "return_exposed_length_mm": 5.0,                  # ASSUMED
+        "traverse_direction": [-1.0, 0.0, 0.0],           # through the agar centre, AWAY from the
+                                                          # stimulating electrode (step 68)
+        "traverse_distances_mm": [5, 15, 25, 30, 35, 37.5, 42.5, 45, 50, 55, 60, 65],
+                                                          # from the agar centre; >= 4 inside, >= 4 in
+                                                          # saline, rest within 5 mm of the interface.
+                                                          # Nearest-point spacing: runs/traverse_design.py
+        "position_uncertainty_mm": 0.10,                  # plan v15 (step 66)
+        "voltage_noise_V": 5e-6,                          # ASSUMED residual noise after averaging 20
+                                                          # traces; replace with the session noise floor
+        "sigma_in_nominal_S_per_m": 2.9,                  # ~18 g/L NaCl agar; measured (step 62)
+        "sigma_out_nominal_S_per_m": 0.80,                # ~4.5 g/L NaCl; measured (step 64)
+        "current_nominal_A": [50e-6, 100e-6],
     },
 }
 
@@ -258,13 +274,27 @@ def solve_tank(setup, f=1.0, verbose=True):
         P = np.array([[p[0], yy(p[1]), zi + dz] for p in xy for zi in zz])
         return interp(P).reshape(len(xy), len(zz)).mean(1)
     G = G_at(geo["rec_xy"])
-    ref = np.asarray(setup["part6"].get("alt_reference_xyz_mm") or [np.nan] * 3, float) * mm
-    if np.all(np.isfinite(ref)):
-        ry_ = geo["sy"] + abs(ref[1] - geo["sy"]) if geo["sym"] else ref[1]
-        G_ref = float(interp([[ref[0], ry_, ref[2]]])[0])
-    else:
-        G_ref = np.nan
-    return {"G": G, "G_alt_reference": G - G_ref, "G_at_alt_reference_point": G_ref, "f": f, "nodes": int(np.prod(shape)), "unknowns": st["unknowns"],
+    # far reference wire (condition B): a high-impedance wire, so it reads the
+    # AVERAGE potential along its exposed tip and does not disturb the field
+    s6 = setup["part6"]
+    rx_, ry_ = np.asarray(s6["reference_xy_mm"], float) * mm
+    rz0, rz1 = np.asarray(s6["reference_exposed_z_mm"], float) * mm
+    if geo["sym"]:
+        ry_ = geo["sy"] + abs(ry_ - geo["sy"])
+    zr = np.linspace(rz0, rz1, 11)
+    G_ref = float(np.mean(interp(np.column_stack([np.full(11, rx_), np.full(11, ry_), zr]))))
+    def G_point(P):
+        """G at arbitrary points (n, 3), mirrored into the solved half if needed."""
+        P = np.array(P, float).reshape(-1, 3)
+        if geo["sym"]:
+            P[:, 1] = geo["sy"] + np.abs(P[:, 1] - geo["sy"])
+        return interp(P)
+    def G_reference(xy_m, z0_m, z1_m):
+        zz_ = np.linspace(z0_m, z1_m, 11)
+        return float(np.mean(G_point(np.column_stack([np.full(11, xy_m[0]), np.full(11, xy_m[1]), zz_]))))
+    return {"G": G, "G_condition_A": G, "G_condition_B": G - G_ref, "G_reference_wire": G_ref,
+            "G_point": G_point, "G_reference": G_reference,
+            "f": f, "nodes": int(np.prod(shape)), "unknowns": st["unknowns"],
             "symmetry_half": geo["sym"],
             "R_disk_to_return_x_sigma": st["floating_potentials"][0],
             "current_check": current_out_of(L, phi, disk) / I,
@@ -306,72 +336,150 @@ def idealized_tank(geo):
 # PART 7: agar sphere in a spherical container
 # ---------------------------------------------------------------------------
 
-def icosahedron(R):
-    p = (1 + 5 ** 0.5) / 2
-    v = np.array([[-1, p, 0], [1, p, 0], [-1, -p, 0], [1, -p, 0],
-                  [0, -1, p], [0, 1, p], [0, -1, -p], [0, 1, -p],
-                  [p, 0, -1], [p, 0, 1], [-p, 0, -1], [-p, 0, 1]], float)
-    return R * v / np.linalg.norm(v, axis=1, keepdims=True)
+def fd_ratio(r, phi, r_iface):
+    """Gradient ratio across the interface FROM DISCRETE POINTS, exactly as it
+    will be computed from the measurements: slope between the two traverse
+    points nearest the interface on the inside, divided by the slope between
+    the two nearest on the outside. r: distances from the agar centre along
+    the traverse (sorted); phi: potentials there. For an exact interface the
+    limit is sigma_out / sigma_in (normal current continuous)."""
+    r = np.asarray(r, float); phi = np.asarray(phi, float)
+    i_in = np.flatnonzero(r < r_iface); i_out = np.flatnonzero(r > r_iface)
+    a, b = i_in[-2], i_in[-1]
+    c, d = i_out[0], i_out[1]
+    s_in = (phi[b] - phi[a]) / (r[b] - r[a])
+    s_out = (phi[d] - phi[c]) / (r[d] - r[c])
+    return s_in / s_out, (a, b, c, d)
 
 
-def solve_sphere(setup, stim_index=0, f=1.0, ratio=None, verbose=True):
-    """Solve Part 7 for one stimulating position at grid factor f.
-    Coordinates: container centre at the origin. sigma_out = 1 and
-    sigma_in = ratio (default: the nominal ratio), so the result is
-    G = phi * sigma_out / I."""
-    s7 = setup["part7"]
+def sphere_geometry(s7, stim_index):
     Rc = s7["container_inner_diameter_mm"] / 2 * mm
     Ra = s7["agar_diameter_mm"] / 2 * mm
     ca = np.asarray(s7["agar_centre_offset_mm"], float) * mm
     st_pos = ca + np.asarray(s7["stim_offsets_mm"][stim_index], float) * mm
     rp = np.asarray(s7["return_position_mm"], float) * mm
+    u = np.asarray(s7["traverse_direction"], float); u = u / np.linalg.norm(u)
+    return Rc, Ra, ca, st_pos, rp, u
+
+
+def solve_sphere(setup, stim_index=0, f=1.0, ratio=None, verbose=True):
+    """Solve Part 7 (plan v15 steps 65-68) for one stimulating position at grid
+    factor f. Container centre at the origin; sigma_out = 1 and sigma_in =
+    ratio (default: the nominal ratio), so the result is G = phi sigma_out / I.
+
+    Geometry: agar sphere (sigma_in) inside the saline (sigma_out), container
+    wall insulating; stimulating wire tip inside the agar (floating, carries
+    I); return wire INSIDE the saline (0 V; the oscilloscope ground). The
+    traverse runs through the agar centre along `traverse_direction`, so it
+    crosses the interface perpendicular to the surface. The grid is refined
+    along the traverse and most finely where it crosses the interface."""
+    s7 = setup["part7"]
+    Rc, Ra, ca, st_pos, rp, u = sphere_geometry(s7, stim_index)
     rw = s7["stim_wire_diameter_mm"] / 2 * mm
     tip = s7["stim_tip_length_mm"] * mm
     rl = s7["return_exposed_length_mm"] * mm
     if ratio is None:
         ratio = s7["sigma_in_nominal_S_per_m"] / s7["sigma_out_nominal_S_per_m"]
-
+    cross = ca + Ra * u                                    # where the traverse meets the interface
+    end = ca + (Rc - 2 * mm) * u
     n_tip = max(int(round(4 / f)), 1)
     h0 = rw / n_tip
     g = 1 + 0.12 * f
     hf = 4 * mm * f
-    def axis(c_stim, c_ret, along):
-        half = (rl / 2 if along else rw) + 1 * mm
-        zones = [(c_ret - half, c_ret + half, (rw / 2 if not along else 0.5 * mm) * f, 1 - 1 / g)]
-        return graded_axis(-Rc - 2 * hf, Rc + 2 * hf, c_stim, h0, h0 * n_tip, g, hf, zones=zones)
-    x, y, z = axis(st_pos[0], rp[0], False), axis(st_pos[1], rp[1], False), axis(st_pos[2], rp[2], True)
+    def axis(k, along):
+        # the return wire sets the absolute level of every reading (its own
+        # spreading resistance), so resolve it well: across it rw/3, along it rw
+        zones = [(rp[k] - (rl / 2 if along else rw) - 1 * mm, rp[k] + (rl / 2 if along else rw) + 1 * mm,
+                  (rw if along else rw / 3) * f, 1 - 1 / g)]
+        lo_t, hi_t = sorted([ca[k], end[k]])
+        if hi_t - lo_t > 1 * mm:                           # traverse runs along this axis
+            zones.append((lo_t - 1 * mm, hi_t + 1 * mm, 0.5 * mm * f))
+            zones.append((cross[k] - 1.5 * mm, cross[k] + 1.5 * mm, 0.15 * mm * f, 1 - 1 / g))
+        else:                                              # across the traverse: keep it resolved
+            zones.append((cross[k] - 2 * mm, cross[k] + 2 * mm, 0.5 * mm * f))
+        return graded_axis(-Rc - 2 * hf, Rc + 2 * hf, st_pos[k], h0, h0 * n_tip, g, hf, zones=zones)
+    # mirror symmetry about the plane y = 0 when the stimulating tip, the
+    # return, the agar centre and the traverse all lie in it: solve y >= 0
+    # with the plane insulating (as for the tank), half the current
+    sym = (abs(st_pos[1]) < 1e-9 and abs(rp[1]) < 1e-9 and abs(ca[1]) < 1e-9 and abs(u[1]) < 1e-12)
+    x, y, z = axis(0, False), axis(1, False), axis(2, True)
+    if sym:
+        y = y[y >= -1e-12]
+        y[0] = 0.0
     shape = (len(x), len(y), len(z))
     X, Y, Z = np.meshgrid(x, y, z, indexing="ij")
     R = np.sqrt(X ** 2 + Y ** 2 + Z ** 2)
     sigma = np.ones(shape)
     sigma[np.sqrt((X - ca[0]) ** 2 + (Y - ca[1]) ** 2 + (Z - ca[2]) ** 2) <= Ra] = ratio
     sigma[R > Rc] = 1e-8                                   # insulating container wall / outside
-    # stimulating tip and return: vertical exposed wire ends (stim floating,
-    # carries I; return at 0 V), selected by control-box overlap
     stim = vertical_cylinder(x, y, z, st_pos[0], st_pos[1], rw, st_pos[2] - tip / 2, st_pos[2] + tip / 2)
     ret = vertical_cylinder(x, y, z, rp[0], rp[1], rw, rp[2] - rl / 2, rp[2] + rl / 2)
     del X, Y, Z, R
+    if np.hypot(rp[0], rp[1]) > Rc or np.linalg.norm(rp) > Rc:
+        raise ValueError("return electrode outside the container: no current could reach it")
     if verbose:
         print(f"  sphere grid x{f:g}: {np.prod(shape):,} nodes; tip {stim.sum()} nodes, "
-              f"return {ret.sum()} nodes; ratio sigma_in/out {ratio:.3f}")
+              f"return {ret.sum()} nodes; sigma_in/out {ratio:.3f}")
     phi, st = solve_general(x, y, z, sigma, fixed=ret, phi_fixed=np.zeros(shape),
-                            floating=[(stim, 1.0)])
+                            floating=[(stim, 0.5 if sym else 1.0)])
     st.pop("L")
-    rec = icosahedron(s7["recording_radius_mm"] * mm)
     interp = RegularGridInterpolator((x, y, z), phi, method="cubic")
-    line_r = np.asarray(s7.get("line_positions_mm") or [], float) * mm
-    zz = np.linspace(-0.5 * mm, 0.5 * mm, 11)               # 1 mm vertical tip, centred
-    lz = s7.get("line_z_offset_mm", 0.0) * mm + st_pos[2]
-    G_line = np.array([np.mean(interp(np.column_stack([np.full(11, r), np.zeros(11), lz + zz])))
-                       for r in line_r]) if len(line_r) else np.array([])
-    # 1 mm radial tip ending at the recording radius
-    u = rec / np.linalg.norm(rec, axis=1, keepdims=True)
-    ts = np.linspace(0, 1 * mm, 11)
-    P = (rec[:, None, :] + ts[None, :, None] * u[:, None, :]).reshape(-1, 3)
-    G = interp(P).reshape(len(rec), len(ts)).mean(1)
-    def G_points(P, tip_dirs):
-        """Tip-averaged G at points P (n, 3) with 1 mm tips along tip_dirs."""
-        Q = (P[:, None, :] + ts[None, :, None] * tip_dirs[:, None, :]).reshape(-1, 3)
-        return interp(Q).reshape(len(P), len(ts)).mean(1)
-    return {"G": G, "positions_m": rec, "G_line": G_line, "line_x_m": line_r, "G_points": G_points,
-            "nodes": int(np.prod(shape)), "ratio": ratio, "stim_position_m": st_pos}
+    zz = np.linspace(-0.5 * mm, 0.5 * mm, 11)              # 1 mm vertical recording tip, centred
+    def G_traverse(dist_m):
+        """Tip-averaged G at distances (m) from the agar centre along the traverse."""
+        dist_m = np.atleast_1d(np.asarray(dist_m, float))
+        P = ca[None, :] + dist_m[:, None] * u[None, :]
+        Q = (P[:, None, :] + np.array([0, 0, 1.0])[None, None, :] * zz[None, :, None]).reshape(-1, 3)
+        return interp(Q).reshape(len(P), len(zz)).mean(1)
+    d = np.sort(np.asarray(s7["traverse_distances_mm"], float)) * mm
+    G = G_traverse(d)
+    return {"G": G, "distances_m": d, "G_traverse": G_traverse, "interface_m": Ra,
+            "nodes": int(np.prod(shape)), "ratio": ratio, "stim_position_m": st_pos,
+            "symmetry_half": bool(sym)}
+
+
+def design_spacing(G_traverse, r_iface, ratio_ideal, sigma_out, current_A, noise_V, pos_unc_m,
+                   spacings_m=None, max_outer_m=5 * mm):
+    """Plan v15 step 66: choose the spacing d of the points nearest the
+    interface (at r_iface -/+ d and -/+ 2d) by error propagation, BEFORE the
+    session. For each d:
+      gap    (finite-difference ratio / ideal ratio) - 1   (closer points: smaller)
+      U_pos  ratio change for +-pos_unc on each of the 4 points (linear, RSS)
+      U_noise  ratio change for +-noise_V on each of the 4 readings (RSS)
+    combined = sqrt(gap^2 + U_pos^2 + U_noise^2); returns the table and the
+    d that minimizes it. Potentials in volts: V = I G / sigma_out."""
+    if spacings_m is None:
+        spacings_m = np.arange(0.5, 6.01, 0.25) * mm
+    rows = []
+    for d in spacings_m:
+        r = np.array([r_iface - 2 * d, r_iface - d, r_iface + d, r_iface + 2 * d])
+        V = current_A * G_traverse(r) / sigma_out
+        R0 = ((V[1] - V[0]) / d) / ((V[3] - V[2]) / d)
+        # position: shift each point by +-pos_unc (potential follows the local slope)
+        dV = current_A * (G_traverse(r + 1e-5) - G_traverse(r - 1e-5)) / (2e-5) / sigma_out
+        def ratio_of(Vv, rr):
+            return ((Vv[1] - Vv[0]) / (rr[1] - rr[0])) / ((Vv[3] - Vv[2]) / (rr[3] - rr[2]))
+        up = []
+        for k in range(4):
+            rr = r.copy(); rr_true = r.copy(); rr_true[k] += pos_unc_m
+            Vt = V.copy(); Vt[k] += dV[k] * pos_unc_m          # measured at a slightly wrong place
+            up.append(ratio_of(Vt, rr) / R0 - 1)
+        un = []
+        for k in range(4):
+            Vn = V.copy(); Vn[k] += noise_V
+            un.append(ratio_of(Vn, r) / R0 - 1)
+        U_pos = float(np.sqrt(np.sum(np.square(up))))
+        U_noise = float(np.sqrt(np.sum(np.square(un))))
+        gap = float(R0 / ratio_ideal - 1)
+        rows.append({"spacing_mm": float(d / mm), "fd_ratio": float(R0), "gap_rel": gap,
+                     "U_pos_rel": U_pos, "U_noise_rel": U_noise,
+                     "combined_rel": float(np.sqrt(gap ** 2 + U_pos ** 2 + U_noise ** 2)),
+                     "dV_inside_pair_V": float(abs(V[1] - V[0])), "dV_outside_pair_V": float(abs(V[3] - V[2]))})
+    # plan step 68: the near-interface points lie within 5 mm of the interface,
+    # so the outer point of each pair (at 2d) must be <= max_outer_m away
+    allowed = [q for q in rows if 2 * q["spacing_mm"] * mm <= max_outer_m + 1e-12]
+    best = min(allowed, key=lambda q: q["combined_rel"])
+    best_unconstrained = min(rows, key=lambda q: q["combined_rel"])
+    best = dict(best, best_without_5mm_rule_mm=best_unconstrained["spacing_mm"],
+                combined_without_5mm_rule_rel=best_unconstrained["combined_rel"])
+    return rows, best

@@ -43,6 +43,13 @@ CHIPS = {
                 "z_1kHz": (300e3, 600e3), "recommended_mV": (300, 600)},
     "MaxOne+": {"pad_x": 11.50 * um, "pad_y": 11.50 * um, "coating": "PEDOT",
                 "z_1kHz": (70e3, 150e3), "recommended_mV": (100, 300)},
+    # Ronchi et al. 2019 describe an array with the same electrode count, pitch
+    # and sensing area but 5 x 9 um^2 electrodes: probably a chip variant. Kept
+    # for the pad-size sensitivity run (plan v16); impedance not reported there,
+    # so the MaxOne range is reused (runs/pad_size_sensitivity.py also tries
+    # scaling it with area).
+    "MaxOne (5x9, Ronchi 2019)": {"pad_x": 5.00 * um, "pad_y": 9.00 * um, "coating": "platinum black",
+                                  "z_1kHz": (300e3, 600e3), "recommended_mV": (300, 600)},
 }
 
 PROVISIONAL = {

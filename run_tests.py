@@ -47,12 +47,14 @@ QUICK = [
     ("Phantom predictions (quick)",  ["runs/phantom_predict.py", "--quick"]),
     ("Saturation map (quick)",       ["runs/saturation_map.py", "--quick"]),
     ("Aim 2 budget study (quick)",   ["runs/aim2_budget.py", "--quick"]),
+    ("Stimulator sweep (quick)",     ["runs/stimulator_sweep.py", "--quick"]),
 ]
 SLOW = [
     ("Step 7 point source (x1)",     ["tests/step7_point_source_cube.py"]),
     ("Aim 3 pipeline (quick)",       ["runs/aim3_activation.py", "--quick"]),
     ("Aim 3 maps (quick)",           ["runs/aim3_maps.py", "--quick"]),
     ("Anisotropic MaxOne (quick)",   ["runs/anisotropic_maxone.py", "--quick"]),
+    ("Pad-size sensitivity (quick)", ["runs/pad_size_sensitivity.py", "--quick"]),
 ]
 
 tests = QUICK + (SLOW if "--all" in sys.argv else [])
