@@ -292,8 +292,12 @@ def blank_interp(y, t_samp, t0, t1):
 # Provenance: Daniel A. Wagenaar's own code -- PyPI package `salpa` 1.0 (a
 # pybind11 wrapper compiled from the author's C++ LocalFit, originally part of
 # MEABench), repository https://github.com/wagenadl/salpa (commit 8c06ce7,
-# 2026-06-28), licence GPL-3.0-or-later. It is INSTALLED as a dependency
-# (`pip install salpa`), not copied into this repository. Reference: Wagenaar
+# 2026-06-28), licence GPL-3.0-or-later. It is INSTALLED as a dependency, not
+# copied into this repository. PyPI has wheels only for Linux and Windows, so
+# on macOS it is built from the author's source at that commit (SALPA_INSTALL;
+# needs a C++ compiler: xcode-select --install). Check (Nov 11): the
+# source build and the PyPI wheel give bitwise-identical output on 40 shared
+# test traces (5964 samples), both on Linux. Reference: Wagenaar
 # & Potter (2002), J. Neurosci. Methods 120, 113-120.
 # Parameters: the author's command-line defaults from src/salpa.cpp:
 # tau (half-width) 3 ms, blank-depeg 20 samples, look-ahead 5 samples,
@@ -308,12 +312,31 @@ SALPA_LABEL = "SALPA (original implementation)"
 SALPA_PEG_LABEL = "SALPA (original), forced peg over the stimulus"
 
 
+SALPA_INSTALL = 'pip install "git+https://github.com/wagenadl/salpa@8c06ce7#subdirectory=python"'
+
+
 def salpa_available():
     try:
         import salpa  # noqa: F401
         return True
     except Exception:
         return False
+
+
+def salpa_provenance():
+    """How the installed salpa was obtained: PyPI wheel, or built from a git commit."""
+    import json
+    from importlib import metadata
+    try:
+        d = metadata.distribution("salpa")
+    except metadata.PackageNotFoundError:
+        return "not installed"
+    du = d.read_text("direct_url.json")
+    if du:
+        u = json.loads(du)
+        commit = u.get("vcs_info", {}).get("commit_id", "?")
+        return f"salpa {d.version} built from source {u.get('url')} commit {commit[:7]}"
+    return f"salpa {d.version} from PyPI (wheel; github.com/wagenadl/salpa commit 8c06ce7)"
 
 
 SALPA_PAD = 200            # samples of baseline before and after each snippet (10 ms at 20 kHz)

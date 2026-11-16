@@ -52,6 +52,30 @@ Recording tips are thin wires with a 1 mm exposed end: the tip's reading is
 the AVERAGE potential along the exposed length (high-impedance input). The
 recording wire's own disturbance of the field is not modelled (stated
 limitation; it matters only at the closest positions).
+
+EXPERIMENTS (Nov 15, 2026: the phantom is the project's primary validation)
+  The setup file lists named Part 6 layouts under "experiments"; each one is
+  the baseline tank with some fields replaced, and each is predicted blind:
+    E1_distance     disk flush in the plate, return wire at the far wall:
+                    potential against distance, full model vs point source
+    E2_no_plate     the SAME wire end with no plate (on a thin insulated post
+                    in open saline): the plate should about double the reading
+    E3_return_top   return = a metal sheet above the electrode
+    E3_return_ring  return = a ring around the electrode, on the plate
+                    (with E1 these are the array's three return paths at
+                    phantom scale)
+  Supports: "plate" (insulating block) or "post" (insulated wire/tube).
+  Returns:  "wire" (vertical exposed wire), "plate" (horizontal metal sheet),
+            "ring" (horizontal wire or strip ring).
+
+PREDICTION BANDS (tank_bands, sphere_bands)
+  Every committed number is a band: a Monte Carlo over the measured inputs
+  (each probe's position and height, the electrode diameter, the reference
+  wire's position) through the fine-grid solution, with the grid uncertainty
+  (GCI) drawn in the same samples. Conductivity, temperature and current
+  enter as V = I G / sigma; their stated uncertainties give the band in
+  mV per uA, and the comparison recomputes that part from the values
+  measured on the day.
 """
 import json
 import numpy as np
@@ -68,14 +92,48 @@ um = 1e-6
 # are marked ASSUMED and must be checked against the built apparatus
 # ---------------------------------------------------------------------------
 DEFAULT_SETUP = {
-    "_comment": "Part 6/7 phantom geometry (research plan v16). Units: mm, S/m, A. Replace "
-                "every value marked ASSUMED with the measured one BEFORE committing predictions.",
+    "_comment": "Phantom geometry and instruments (research plan v16 + Nov 15 experiments). Units: "
+                "mm, S/m, A, V. Replace every value marked ASSUMED with the measured one BEFORE "
+                "committing predictions.",
+    "instrument": {
+        "_comment": "NOT YET CONFIRMED (Nov 15): set these from the school's instruments.",
+        "scope_bits": 8,                                  # ASSUMED
+        "scope_full_scale_divisions": 8.0,                # ASSUMED (some scopes: 10)
+        "scope_min_volts_per_div": 0.002,                 # ASSUMED: smallest V/div
+        "scope_channels": 2,                              # ASSUMED
+        "scope_single_sample_noise_V": 150e-6,            # ASSUMED; measure: runs/scope_noise.py
+        "scope_samples_in_plateau": 500,                  # ASSUMED: samples in the middle half of a phase
+        "generator_channels": 1,                          # ASSUMED (2 needed for physical spikes)
+        "generator_max_amplitude_V": 10.0,                # ASSUMED: peak, into the series resistor
+        "series_resistor_ohm": 100e3,                     # plan
+    },
+    "pulse": {
+        "_comment": "Stimulus settings (ASSUMED until the generator is confirmed).",
+        "phase_widths_us": [100.0, 200.0, 500.0],         # plan: three pulse widths
+        "interphase_us": 0.0,
+        "repetition_Hz": 100.0,                           # ASSUMED
+        "generator_amplitude_V": 10.0,                    # ASSUMED: 10 V / 100 kOhm = 100 uA
+        "generator_rise_time_s": 0.0,                     # from the generator's manual, if stated
+    },
+    "uncertainties": {
+        "_comment": "Standard uncertainties (1 SD) of the inputs, for the Monte Carlo bands.",
+        "probe_position_sd_mm": 0.10,                     # plan: +-0.1 mm, taken as 1 SD, along and across
+        "probe_height_sd_mm": 0.25,                       # ASSUMED
+        "electrode_diameter_rel_sd": 0.02,                # 0.50 +- 0.01 mm (caliper)
+        "reference_position_sd_mm": 1.0,                  # ASSUMED: placed by ruler
+        "sigma_meter_rel_sd": 0.01,                       # ASSUMED: conductivity meter
+        "temperature_sd_C": 0.5,                          # ASSUMED: between the sigma reading and the trace
+        "sigma_temp_coeff_per_C": 0.02,                   # NaCl solutions, about 2 % per C near 20-25 C
+        "current_rel_sd": 0.01,                           # 1 % resistor; measure it with a multimeter
+        "scope_gain_rel_sd": 0.015,                       # ASSUMED: 3 % vertical accuracy as a 95 % bound
+        "mc_samples": 4000, "mc_seed": 2026,
+    },
     "part6": {
         "tank_inside_mm": [300.0, 200.0, 150.0],          # plan (L x W x H); measure (step 44)
         "fill_depth_mm": 100.0,                           # 6.00 L / (300 x 200 mm) = 100 mm
         "stim_xy_mm": [150.0, 100.0],                     # ASSUMED: centre of the floor
         "stim_disk_diameter_mm": 0.50,                    # plan: 0.50 mm wire, cut flush
-        "plate_mm": [60.0, 60.0, 5.0],                    # ASSUMED: printed plate L x W x thickness
+        "plate_mm": [80.0, 80.0, 5.0],                    # ASSUMED: printed plate L x W x thickness
         "return_xy_mm": [290.0, 100.0],                   # ASSUMED: 10 mm from one end wall, mid-width
         "return_exposed_z_mm": [40.0, 60.0],              # plan: 20 mm exposed; ASSUMED height
         "return_wire_diameter_mm": 0.50,
@@ -83,13 +141,45 @@ DEFAULT_SETUP = {
         "reference_position_uncertainty_mm": 1.0,         # ASSUMED: reference placed by ruler
         "reference_exposed_z_mm": [49.5, 50.5],           # ASSUMED: 1 mm exposed tip at mid-depth
         "recording_direction_xy": [0.0, 1.0],             # ASSUMED: line across the tank (+y)
-        "recording_distances_mm": [1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 15.0, 20.0],  # plan
+        "recording_distances_mm": [1.0, 1.5, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0, 15.0, 20.0, 25.0, 45.0, 60.0],
+                                                          # plan: lid holes 1-20 mm; 25, 45 and 60 mm are
+                                                          # PROPOSED extra holes (Nov 15), where the tank
+                                                          # walls separate the full model from a point source
         "recording_tip_z_mm": [0.5, 1.5],                 # ASSUMED: exposed tip 1 mm, 0.5 mm above plate
         "position_uncertainty_mm": 0.10,                  # plan v15
         "tip_height_uncertainty_mm": 0.25,                # ASSUMED
         "sigma_nominal_S_per_m": 1.55,                    # ~9 g/L NaCl near 22 C; measured on the day
         "current_nominal_A": [50e-6, 100e-6],             # plan
     },
+    "experiments": {
+        "_comment": "Part 6 layouts. Each = part6 with the listed fields replaced. Delete a layout "
+                    "that will not be built. Geometry here is ASSUMED until measured.",
+        "E1_distance": {
+            "description": "Disk flush in the insulating plate, return wire at the far wall",
+            "overrides": {}},
+        "E2_no_plate": {
+            "description": "Same wire end, no plate: on a thin insulated post in open saline",
+            "overrides": {"support": {"type": "post", "diameter_mm": 1.0, "height_mm": 50.0}}},
+                                                          # ASSUMED: post = the wire in its own insulation
+                                                          # (outer diameter 1.0 mm), tip 50 mm above the floor
+        "E3_return_top": {
+            "description": "Return = metal sheet above the electrode (the array's top-plate return)",
+            "overrides": {"return": {"type": "plate", "size_mm": [100.0, 100.0],
+                                     "centre_xy_mm": [150.0, 100.0], "height_above_stim_mm": 20.0}}},
+                                                          # ASSUMED; height null = at the saline surface
+        "E3_return_ring": {
+            "description": "Return = ring on the plate around the electrode (the array's periphery return)",
+            "overrides": {"return": {"type": "ring", "centre_xy_mm": [150.0, 100.0],
+                                     "radius_mm": 30.0, "width_mm": 0.5}}},
+                                                          # ASSUMED: 0.5 mm wire ring; a flat strip is
+                                                          # width_mm = strip width, radius_mm = its mid-radius
+    },
+    "saline_concentrations": {
+        "_comment": "Two concentrations (experiment e): readings x sigma / I must collapse. "
+                    "Nominal conductivities; the measured values go in the sessions CSV.",
+        "nominal_sigma_S_per_m": [1.55, 0.80],
+    },
+    "anisotropic": None,                                  # filled from aniso_phantom.ANISO_DEFAULT by load_setup
     "part7": {
         "container_inner_diameter_mm": 150.0,             # plan
         "agar_diameter_mm": 80.0,                         # plan (mold); measured (step 63)
@@ -123,9 +213,29 @@ def load_setup(path=None):
     s = json.loads(json.dumps(DEFAULT_SETUP))
     if path is not None:
         user = json.loads(open(path).read())
-        for part in ("part6", "part7"):
+        for part in ("part6", "part7", "instrument", "pulse", "uncertainties", "saline_concentrations"):
             s[part].update(user.get(part, {}))
+        if "experiments" in user:                         # the user's list replaces the default list
+            s["experiments"] = user["experiments"]
+    from aniso_phantom import ANISO_DEFAULT              # (imported here: aniso_phantom imports this module)
+    an = json.loads(json.dumps(ANISO_DEFAULT))
+    if path is not None:
+        an.update(user.get("anisotropic") or {})
+    s["anisotropic"] = an
     return s
+
+
+def experiment_names(setup):
+    return [k for k in setup.get("experiments", {}) if not k.startswith("_")]
+
+
+def layout_setup(setup, name=None):
+    """The part6 block for one experiment: the baseline with that experiment's
+    overrides applied. name None -> the baseline itself."""
+    s6 = json.loads(json.dumps(setup["part6"]))
+    if name is not None:
+        s6.update(setup["experiments"][name].get("overrides", {}))
+    return s6
 
 
 # ---------------------------------------------------------------------------
@@ -166,46 +276,99 @@ def tank_geometry(s6):
     depth = g["fill_depth_mm"]
     sx, sy = g["stim_xy_mm"]
     a = g["stim_disk_diameter_mm"] / 2
-    px, py, pt = g["plate_mm"]
     d = np.asarray(s6["recording_direction_xy"], float)
     d = d / np.linalg.norm(d)
     dist = g["recording_distances_mm"]
     rec_xy = np.column_stack([sx + dist * d[0], sy + dist * d[1]])
-    ry = g["return_xy_mm"][1]
-    # mirror symmetry about y = Ly/2 when the electrode, plate and return wire
-    # all sit on that plane: solve half the tank (y >= Ly/2) with the plane
-    # insulating, as in step 7; recording points with y < Ly/2 are mirrored
-    sym = abs(sy - Ly / 2) < 1e-9 and abs(ry - Ly / 2) < 1e-9
-    return dict(Lx=Lx, Ly=Ly, depth=depth, sx=sx, sy=sy, a=a, plate=(px, py, pt),
-                rx=g["return_xy_mm"][0], ry=ry,
-                rz=g["return_exposed_z_mm"], rw=g["return_wire_diameter_mm"] / 2,
+    # --- what the disk sits in: an insulating plate (block) or a thin insulated post
+    sup = s6.get("support")
+    if sup is None or sup.get("type", "plate") == "plate":
+        size = sup["size_mm"] if sup else s6["plate_mm"]
+        support = {"type": "plate", "px": size[0] * mm, "py": size[1] * mm}
+        pt = size[2] * mm
+    elif sup["type"] == "post":
+        support = {"type": "post", "radius": sup["diameter_mm"] / 2 * mm}
+        pt = sup["height_mm"] * mm
+        if support["radius"] < a:
+            raise ValueError("post diameter is smaller than the electrode")
+    else:
+        raise ValueError(f"support type must be 'plate' or 'post', got {sup['type']!r}")
+    # --- the return electrode
+    rt = s6.get("return")
+    if rt is None or rt.get("type", "wire") == "wire":
+        xy = rt["xy_mm"] if rt else s6["return_xy_mm"]
+        zz = rt["exposed_z_mm"] if rt else s6["return_exposed_z_mm"]
+        wd = rt["wire_diameter_mm"] if rt else s6["return_wire_diameter_mm"]
+        ret = {"type": "wire", "x": xy[0] * mm, "y": xy[1] * mm, "z0": zz[0] * mm, "z1": zz[1] * mm,
+               "rw": wd / 2 * mm}
+        ret_sym_y = ret["y"]
+    elif rt["type"] == "plate":
+        h = rt.get("height_above_stim_mm")
+        z = depth if h is None else pt + h * mm
+        if z > depth + 1e-12:
+            raise ValueError("the return sheet is above the saline surface")
+        ret = {"type": "plate", "cx": rt["centre_xy_mm"][0] * mm, "cy": rt["centre_xy_mm"][1] * mm,
+               "sx": rt["size_mm"][0] * mm, "sy": rt["size_mm"][1] * mm, "z": z}
+        ret_sym_y = ret["cy"]
+    elif rt["type"] == "ring":
+        ret = {"type": "ring", "cx": rt["centre_xy_mm"][0] * mm, "cy": rt["centre_xy_mm"][1] * mm,
+               "R": rt["radius_mm"] * mm, "hw": rt["width_mm"] / 2 * mm,
+               "z": pt + rt.get("height_above_stim_mm", 0.0) * mm}
+        ret_sym_y = ret["cy"]
+    else:
+        raise ValueError(f"return type must be 'wire', 'plate' or 'ring', got {rt['type']!r}")
+    # mirror symmetry about y = Ly/2 when the electrode, its support and the
+    # return all sit on that plane: solve half the tank (y >= Ly/2) with the
+    # plane insulating, as in step 7; recording points with y < Ly/2 are mirrored
+    sym = abs(sy - Ly / 2) < 1e-9 and abs(ret_sym_y - Ly / 2) < 1e-9
+    return dict(Lx=Lx, Ly=Ly, depth=depth, sx=sx, sy=sy, a=a, pt=pt, support=support, ret=ret,
                 rec_xy=rec_xy, dist=dist, tip_z=g["recording_tip_z_mm"], direction=d, sym=sym)
 
 
 def tank_grid(geo, f=1.0):
     """Graded grid: finest across the disk (h = a / (8/f) ... ), fine around the
-    return wire and along the recording line, coarse elsewhere. f > 1 coarsens
+    return and along the recording line, coarse elsewhere. f > 1 coarsens
     every spacing and the growth rate (f = 1, 2, 4 give the GCI sequence)."""
     a = geo["a"]
     n_disk = max(int(round(8 / f)), 2)
     h0 = a / n_disk
     g = 1 + 0.12 * f
     hf = 4 * mm * f
-    pt = geo["plate"][2]
-    rw = geo["rw"]
+    pt = geo["pt"]
     d = geo["direction"]
     dmax = float(np.max(geo["dist"])) + 2 * mm
-    wire = lambda c: (c - 3 * rw, c + 3 * rw, max(rw / 3 * f, h0), 1 - 1 / g)
-    line = lambda c0, c1: (min(c0, c1) - 1 * mm, max(c0, c1) + 1 * mm, 0.4 * mm * f)
-    zx = [wire(geo["rx"])] + ([line(geo["sx"], geo["sx"] + d[0] * dmax)] if abs(d[0]) > 0.1 else [])
-    zy = [wire(geo["ry"])] + ([line(geo["sy"], geo["sy"] + abs(d[1]) * dmax)] if abs(d[1]) > 0.1 else [])
+    # along the recording line: 0.4 mm out to 27 mm (where the potential changes
+    # fast), 1 mm beyond that (the far points see a slowly varying field)
+    dnear = min(dmax, 27 * mm)
+    def line(c0, u):
+        zs = [(min(c0, c0 + u * dnear) - 1 * mm, max(c0, c0 + u * dnear) + 1 * mm, 0.4 * mm * f)]
+        if dmax > dnear:
+            zs.append((min(c0, c0 + u * dmax) - 1 * mm, max(c0, c0 + u * dmax) + 1 * mm, 1.0 * mm * f))
+        return zs
+    zx = line(geo["sx"], d[0]) if abs(d[0]) > 0.1 else []
+    zy = line(geo["sy"], abs(d[1]) if geo["sym"] else d[1]) if abs(d[1]) > 0.1 else []
+    zt0, zt1 = geo["tip_z"]
+    zz = [(pt + zt0 - 0.5 * mm, pt + zt1 + 0.5 * mm, 0.25 * mm * f)]
+    r = geo["ret"]
+    if r["type"] == "wire":
+        rw = r["rw"]
+        wire = lambda c: (c - 3 * rw, c + 3 * rw, max(rw / 3 * f, h0), 1 - 1 / g)
+        zx.append(wire(r["x"])); zy.append(wire(r["y"]))
+        zz.append((r["z0"] - 2 * mm, r["z1"] + 2 * mm, 2 * mm * f))
+    elif r["type"] == "plate":                       # a sheet: resolve its height and its edges
+        for zl, c, half in ((zx, r["cx"], r["sx"] / 2), (zy, r["cy"], r["sy"] / 2)):
+            zl.append((c - half - 2 * mm, c + half + 2 * mm, 2 * mm * f))
+            for e in (c - half, c + half):
+                zl.append((e - 1 * mm, e + 1 * mm, 1.0 * mm * f, 1 - 1 / g))
+        zz.append((r["z"] - 1 * mm, r["z"] + 1 * mm, 0.5 * mm * f, 1 - 1 / g))
+    else:                                            # ring: keep the whole disc it encloses fine
+        hc = max(min(0.5 * mm, 2 * r["hw"]) * f, h0)
+        zx.append((r["cx"] - r["R"] - 2 * mm, r["cx"] + r["R"] + 2 * mm, hc))
+        zy.append((r["cy"] - r["R"] - 2 * mm, r["cy"] + r["R"] + 2 * mm, hc))
+        zz.append((r["z"] - 0.5 * mm, r["z"] + 1 * mm, 0.25 * mm * f))
     x = graded_axis(0, geo["Lx"], geo["sx"], h0, a, g, hf, zones=zx)
     y = graded_axis(geo["sy"] if geo["sym"] else 0, geo["Ly"], geo["sy"], h0, a, g, hf, zones=zy)
-    zr0, zr1 = geo["rz"]
-    zt0, zt1 = geo["tip_z"]
-    zz = [(pt + zt0 - 0.5 * mm, pt + zt1 + 0.5 * mm, 0.25 * mm * f),
-          (zr0 - 2 * mm, zr1 + 2 * mm, 2 * mm * f)]
-    # z: plate top at z = pt; nodes exactly on it; below it only the plate block
+    # z: disk plane at z = pt; nodes exactly on it; below it only the support
     z = graded_axis(0, geo["depth"], pt, h0, h0 * n_disk, g, hf, zones=zz)
     return x, y, z
 
@@ -229,77 +392,175 @@ def vertical_cylinder(x, y, z, cx, cy, radius, z0, z1):
     return near[:, :, None] & zin[None, None, :]
 
 
+def horizontal_ring(x, y, z, cx, cy, R, half_width, z0, z1):
+    """Nodes whose control box overlaps a horizontal ring: the annulus
+    R - half_width <= rho <= R + half_width, between heights z0 and z1.
+    A box overlaps the annulus when its nearest point to the centre is inside
+    the outer radius and its farthest point is outside the inner radius, so
+    the selected nodes always form a closed ring, however coarse the grid."""
+    xl, xh = _lo_hi(x); yl, yh = _lo_hi(y); zl, zh = _lo_hi(z)
+    XL, YL = np.meshgrid(xl, yl, indexing="ij"); XH, YH = np.meshgrid(xh, yh, indexing="ij")
+    nearest = np.hypot(np.clip(cx, XL, XH) - cx, np.clip(cy, YL, YH) - cy)
+    farthest = np.hypot(np.maximum(np.abs(XL - cx), np.abs(XH - cx)),
+                        np.maximum(np.abs(YL - cy), np.abs(YH - cy)))
+    ann = (nearest <= R + half_width) & (farthest >= R - half_width)
+    zin = (zh >= z0) & (zl <= z1)
+    return ann[:, :, None] & zin[None, None, :]
+
+
 def tank_masks(geo, x, y, z):
     shape = (len(x), len(y), len(z))
     X, Y = np.meshgrid(x, y, indexing="ij")
-    px, py, pt = geo["plate"]
+    pt = geo["pt"]
     k_top = int(np.argmin(np.abs(z - pt)))
-    # insulating plate block: every node strictly inside it, plus its top face
-    # outside the disk (the top face nodes INSIDE the disk are the metal)
-    in_plate_xy = (np.abs(X - geo["sx"]) <= px / 2) & (np.abs(Y - geo["sy"]) <= py / 2)
+    # insulating support: every node strictly below the disk plane inside it;
+    # the nodes ON the plane inside the disk are the metal, the rest of the
+    # plane is saline resting on the insulator
     rho = np.hypot(X - geo["sx"], Y - geo["sy"])
+    sp = geo["support"]
+    if sp["type"] == "plate":
+        in_xy = (np.abs(X - geo["sx"]) <= sp["px"] / 2) & (np.abs(Y - geo["sy"]) <= sp["py"] / 2)
+    else:
+        in_xy = rho <= sp["radius"] * (1 + 1e-9)
     disk_xy = rho <= geo["a"] * (1 + 1e-9)
     plate = np.zeros(shape, bool)
-    plate[:, :, :k_top] = in_plate_xy[:, :, None]
+    plate[:, :, :k_top] = in_xy[:, :, None]
     disk = np.zeros(shape, bool)
     disk[:, :, k_top] = disk_xy
-    # return wire: nodes whose control box overlaps the exposed cylinder
-    zr0, zr1 = geo["rz"]
-    ret = vertical_cylinder(x, y, z, geo["rx"], geo["ry"], geo["rw"], zr0, zr1)
+    r = geo["ret"]
+    if r["type"] == "wire":                           # nodes whose control box overlaps the cylinder
+        ret = vertical_cylinder(x, y, z, r["x"], r["y"], r["rw"], r["z0"], r["z1"])
+    elif r["type"] == "plate":                        # one layer of nodes: a thin metal sheet
+        k = int(np.argmin(np.abs(z - r["z"])))
+        ret = np.zeros(shape, bool)
+        ret[:, :, k] = (np.abs(X - r["cx"]) <= r["sx"] / 2) & (np.abs(Y - r["cy"]) <= r["sy"] / 2)
+    else:
+        k = int(np.argmin(np.abs(z - r["z"])))
+        ret = horizontal_ring(x, y, z, r["cx"], r["cy"], r["R"], r["hw"], z[k] - 1e-12, z[k] + 1e-12)
+    ret &= ~plate
+    if np.any(ret & disk):
+        raise ValueError("the return electrode touches the stimulating disk")
     return plate, disk, ret, k_top
 
 
-def solve_tank(setup, f=1.0, verbose=True):
-    """Solve Part 6 at grid factor f. Returns G at every recording position
-    (tip-averaged), the disk-to-return resistance x sigma, and the grid."""
-    geo = tank_geometry(setup["part6"])
+def solve_tank(setup, f=1.0, verbose=True, layout=None, s6=None):
+    """Solve one Part 6 layout at grid factor f (layout: a name under
+    "experiments", or None for the baseline; s6 overrides both). Returns G at
+    every recording position (tip-averaged) under both referencing conditions,
+    the disk-to-return resistance x sigma, and functions to evaluate G anywhere."""
+    if s6 is None:
+        s6 = layout_setup(setup, layout)
+    geo = tank_geometry(s6)
     x, y, z = tank_grid(geo, f)
     shape = (len(x), len(y), len(z))
     plate, disk, ret, k_top = tank_masks(geo, x, y, z)
     if verbose:
         print(f"  grid x{f:g}: {len(x)} x {len(y)} x {len(z)} = {np.prod(shape):,} nodes; "
-              f"disk {disk.sum()} nodes, return wire {ret.sum()} nodes")
+              f"disk {disk.sum()} nodes, return ({geo['ret']['type']}) {ret.sum()} nodes")
     sigma = np.ones(shape)                       # sigma = 1 S/m -> phi = G * I
-    sigma[plate] = 1e-8                          # insulating block
+    sigma[plate] = 1e-8                          # insulating support
     I = 0.5 if geo["sym"] else 1.0               # half the tank carries half the current
     phi, st = solve_general(x, y, z, sigma, fixed=ret, phi_fixed=np.zeros(shape),
                             floating=[(disk, I)])
     L = st.pop("L")
+    cur = current_out_of(L, phi, disk) / I
+    back = -current_out_of(L, phi, ret) / I
+    del L
     interp = RegularGridInterpolator((x, y, z), phi, method="cubic")
-    pt = geo["plate"][2]
+    pt = geo["pt"]
     zt0, zt1 = geo["tip_z"]
     zz = np.linspace(pt + zt0, pt + zt1, 21)
-    def G_at(xy, dz=0.0):
-        yy = lambda v: geo["sy"] + abs(v - geo["sy"]) if geo["sym"] else v
-        P = np.array([[p[0], yy(p[1]), zi + dz] for p in xy for zi in zz])
-        return interp(P).reshape(len(xy), len(zz)).mean(1)
-    G = G_at(geo["rec_xy"])
-    # far reference wire (condition B): a high-impedance wire, so it reads the
-    # AVERAGE potential along its exposed tip and does not disturb the field
-    s6 = setup["part6"]
-    rx_, ry_ = np.asarray(s6["reference_xy_mm"], float) * mm
-    rz0, rz1 = np.asarray(s6["reference_exposed_z_mm"], float) * mm
-    if geo["sym"]:
-        ry_ = geo["sy"] + abs(ry_ - geo["sy"])
-    zr = np.linspace(rz0, rz1, 11)
-    G_ref = float(np.mean(interp(np.column_stack([np.full(11, rx_), np.full(11, ry_), zr]))))
     def G_point(P):
         """G at arbitrary points (n, 3), mirrored into the solved half if needed."""
         P = np.array(P, float).reshape(-1, 3)
         if geo["sym"]:
             P[:, 1] = geo["sy"] + np.abs(P[:, 1] - geo["sy"])
+        P[:, 0] = np.clip(P[:, 0], x[0], x[-1]); P[:, 1] = np.clip(P[:, 1], y[0], y[-1])
+        P[:, 2] = np.clip(P[:, 2], z[0], z[-1])
         return interp(P)
+    def G_at(xy, dz=0.0):
+        """Tip-averaged G at (n, 2) positions; dz: height offset, one value or one per position."""
+        xy = np.asarray(xy, float).reshape(-1, 2)
+        dzv = np.broadcast_to(np.asarray(dz, float), (len(xy),))
+        P = np.empty((len(xy), len(zz), 3))
+        P[:, :, 0] = xy[:, None, 0]; P[:, :, 1] = xy[:, None, 1]
+        P[:, :, 2] = zz[None, :] + dzv[:, None]
+        return G_point(P.reshape(-1, 3)).reshape(len(xy), len(zz)).mean(1)
     def G_reference(xy_m, z0_m, z1_m):
-        zz_ = np.linspace(z0_m, z1_m, 11)
-        return float(np.mean(G_point(np.column_stack([np.full(11, xy_m[0]), np.full(11, xy_m[1]), zz_]))))
+        """Far reference wire: a high-impedance wire reads the AVERAGE potential
+        along its exposed tip. xy_m may be (2,) or (n, 2)."""
+        xy = np.asarray(xy_m, float).reshape(-1, 2)
+        z0v = np.broadcast_to(np.asarray(z0_m, float), (len(xy),))
+        z1v = np.broadcast_to(np.asarray(z1_m, float), (len(xy),))
+        w = np.linspace(0, 1, 11)
+        P = np.empty((len(xy), 11, 3))
+        P[:, :, 0] = xy[:, None, 0]; P[:, :, 1] = xy[:, None, 1]
+        P[:, :, 2] = z0v[:, None] + (z1v - z0v)[:, None] * w[None, :]
+        v = G_point(P.reshape(-1, 3)).reshape(len(xy), 11).mean(1)
+        return float(v[0]) if np.ndim(xy_m) == 1 else v
+    G = G_at(geo["rec_xy"])
+    ref_xy = np.asarray(s6["reference_xy_mm"], float) * mm
+    rz0, rz1 = np.asarray(s6["reference_exposed_z_mm"], float) * mm
+    G_ref = G_reference(ref_xy, rz0, rz1)
     return {"G": G, "G_condition_A": G, "G_condition_B": G - G_ref, "G_reference_wire": G_ref,
-            "G_point": G_point, "G_reference": G_reference,
+            "G_point": G_point, "G_reference": G_reference, "ref_xy": ref_xy, "ref_z": (rz0, rz1),
             "f": f, "nodes": int(np.prod(shape)), "unknowns": st["unknowns"],
             "symmetry_half": geo["sym"],
             "R_disk_to_return_x_sigma": st["floating_potentials"][0],
-            "current_check": current_out_of(L, phi, disk) / I,
-            "return_check": -current_out_of(L, phi, ret) / I,
-            "G_at": G_at, "geo": geo, "x": x, "y": y, "z": z}
+            "current_check": cur, "return_check": back,
+            "G_at": G_at, "geo": geo, "x": x, "y": y, "z": z, "s6": s6}
+
+
+def _pct(samples, axis=0):
+    lo, med, hi = np.percentile(samples, [2.5, 50, 97.5], axis=axis)
+    return lo, med, hi
+
+
+def tank_bands(fine, U_num_A, U_num_B, U_num_ref, dlnG_dlna, dlnGref_dlna, unc):
+    """Monte Carlo band of G at every recording position, both conditions.
+
+    Drawn independently in every sample: each probe's position along and
+    across the recording line and its height; the reference wire's position
+    (x, y, height); the electrode diameter (one draw, applied through the
+    committed sensitivity d ln G / d ln a); and the grid error (a relative
+    normal with SD = GCI / 2, since the GCI is a 95% bound).
+    Returns the samples and their 2.5 / 50 / 97.5 percentiles. sigma, the
+    temperature and the current are NOT in here: they multiply every reading
+    (V = I G / sigma) and are added by transfer_band."""
+    rng = np.random.default_rng(int(unc.get("mc_seed", 2026)))
+    n = int(unc.get("mc_samples", 4000))
+    geo = fine["geo"]
+    xy = geo["rec_xy"]; d = geo["direction"]; perp = np.array([-d[1], d[0]])
+    m = len(xy)
+    sp = unc["probe_position_sd_mm"] * mm; sh = unc["probe_height_sd_mm"] * mm
+    da = rng.normal(0, sp, (n, m)); dp = rng.normal(0, sp, (n, m)); dz = rng.normal(0, sh, (n, m))
+    P = xy[None, :, :] + da[:, :, None] * d[None, None, :] + dp[:, :, None] * perp[None, None, :]
+    # a probe cannot go below the support: its lowest point stays above the disk plane
+    dz = np.maximum(dz, -(geo["tip_z"][0] - 0.05 * mm))
+    G = fine["G_at"](P.reshape(-1, 2), dz.reshape(-1)).reshape(n, m)
+    sr = unc["reference_position_sd_mm"] * mm
+    rxy = fine["ref_xy"][None, :] + rng.normal(0, sr, (n, 2))
+    rdz = rng.normal(0, sr, n)
+    Gref = fine["G_reference"](rxy, fine["ref_z"][0] + rdz, fine["ref_z"][1] + rdz)
+    ea = rng.normal(0, unc["electrode_diameter_rel_sd"], n)
+    G = G * (1 + ea[:, None] * dlnG_dlna[None, :])
+    Gref = Gref * (1 + ea * dlnGref_dlna)
+    GA = G * (1 + rng.normal(0, 1, (n, m)) * (U_num_A / 2)[None, :])
+    Gref_n = Gref * (1 + rng.normal(0, 1, n) * (U_num_ref / 2))
+    GB = (G - Gref[:, None]) * (1 + rng.normal(0, 1, (n, m)) * (U_num_B / 2)[None, :])
+    return {"A": GA, "B": GB, "ref": Gref_n, "pct_A": _pct(GA), "pct_B": _pct(GB), "pct_ref": _pct(Gref_n)}
+
+
+def transfer_band(G_samples, sigma_nominal, unc, seed_offset=1):
+    """mV per uA (= kOhm) from G samples: V / I = G / sigma, with the stated
+    conductivity-meter and temperature uncertainties drawn once per sample
+    (they are common to every reading of a session)."""
+    rng = np.random.default_rng(int(unc.get("mc_seed", 2026)) + seed_offset)
+    n = G_samples.shape[0]
+    sig = sigma_nominal * (1 + rng.normal(0, unc["sigma_meter_rel_sd"], n)) \
+        * (1 + unc["sigma_temp_coeff_per_C"] * rng.normal(0, unc["temperature_sd_C"], n))
+    shape = (n,) + (1,) * (G_samples.ndim - 1)
+    return _pct(G_samples / sig.reshape(shape) / 1e3)
 
 
 def gci(f_fine, f_med, f_coarse, r=2.0, Fs=1.25):
@@ -317,9 +578,12 @@ def gci(f_fine, f_med, f_coarse, r=2.0, Fs=1.25):
     return g, p
 
 
-def idealized_tank(geo):
-    """G from the three idealized models at the recording positions (tip-averaged)."""
-    pt = geo["plate"][2]
+def idealized_tank(geo, s6=None):
+    """G from the idealized models at the recording positions (tip-averaged).
+    The plain formulas put zero potential at infinity. With s6 given, two
+    "referenced" versions are added: the same point source read against the
+    far reference wire, 1/r - 1/r_ref -- the fairest simple prediction for
+    condition B."""
     zt0, zt1 = geo["tip_z"]
     rho = geo["dist"]
     out = {}
@@ -329,6 +593,12 @@ def idealized_tank(geo):
                                            0, 0, zt0, zt1)
     out["disk, half space"] = tip_average(lambda xx, yy, zz: disk_half_space(rho, zz, geo["a"]),
                                           0, 0, zt0, zt1)
+    if s6 is not None:
+        rx, ry = np.asarray(s6["reference_xy_mm"], float) * mm
+        rz = np.mean(s6["reference_exposed_z_mm"]) * mm
+        r_ref = float(np.sqrt((rx - geo["sx"]) ** 2 + (ry - geo["sy"]) ** 2 + (rz - geo["pt"]) ** 2))
+        out["point, full space, referenced"] = out["point, full space"] - point_full_space(r_ref)
+        out["point, half space, referenced"] = out["point, half space"] - point_half_space(r_ref)
     return out
 
 

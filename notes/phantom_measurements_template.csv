@@ -1,7 +1,9 @@
-part,session,position,condition,stim_index,pulse_width_us,current_A,current_rel_sd,plateau_V,plateau_V_sd,n_traces,noise_floor_V
-6,1,0,A,0,100,5.0e-5,0.01,,,20,
-6,1,0,B,0,100,5.0e-5,0.01,,,20,
-6,1,1,A,0,100,5.0e-5,0.01,,,20,
-6,1,1,B,0,100,5.0e-5,0.01,,,20,
-7,3,0,A,0,100,1.0e-4,0.01,,,20,
-7,3,1,A,0,100,1.0e-4,0.01,,,20,
+part,session,layout,position,condition,stim_index,pulse_width_us,current_A,current_rel_sd,plateau_V,plateau_V_sd,n_traces,noise_floor_V
+6,1,E1_distance,0,A,0,100,1.0e-4,0.01,,,64,
+6,1,E1_distance,0,B,0,100,1.0e-4,0.01,,,64,
+6,1,E1_distance,1,A,0,100,1.0e-4,0.01,,,64,
+6,1,E1_distance,1,B,0,100,1.0e-4,0.01,,,64,
+6,2,E2_no_plate,0,B,0,100,1.0e-4,0.01,,,64,
+6,2,E3_return_top,0,B,0,100,1.0e-4,0.01,,,64,
+6,2,E3_return_ring,0,B,0,100,1.0e-4,0.01,,,64,
+7,3,,0,A,0,100,1.0e-4,0.01,,,64,

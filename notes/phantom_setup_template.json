@@ -1,5 +1,43 @@
 {
-  "_comment": "Part 6/7 phantom geometry (research plan v16). Units: mm, S/m, A. Replace every value marked ASSUMED with the measured one BEFORE committing predictions.",
+  "_comment": "Phantom geometry and instruments (research plan v16 + Nov 15 experiments). Units: mm, S/m, A, V. Replace every value marked ASSUMED with the measured one BEFORE committing predictions.",
+  "instrument": {
+    "_comment": "NOT YET CONFIRMED (Nov 15): set these from the school's instruments.",
+    "scope_bits": 8,
+    "scope_full_scale_divisions": 8.0,
+    "scope_min_volts_per_div": 0.002,
+    "scope_channels": 2,
+    "scope_single_sample_noise_V": 0.00015,
+    "scope_samples_in_plateau": 500,
+    "generator_channels": 1,
+    "generator_max_amplitude_V": 10.0,
+    "series_resistor_ohm": 100000.0
+  },
+  "pulse": {
+    "_comment": "Stimulus settings (ASSUMED until the generator is confirmed).",
+    "phase_widths_us": [
+      100.0,
+      200.0,
+      500.0
+    ],
+    "interphase_us": 0.0,
+    "repetition_Hz": 100.0,
+    "generator_amplitude_V": 10.0,
+    "generator_rise_time_s": 0.0
+  },
+  "uncertainties": {
+    "_comment": "Standard uncertainties (1 SD) of the inputs, for the Monte Carlo bands.",
+    "probe_position_sd_mm": 0.1,
+    "probe_height_sd_mm": 0.25,
+    "electrode_diameter_rel_sd": 0.02,
+    "reference_position_sd_mm": 1.0,
+    "sigma_meter_rel_sd": 0.01,
+    "temperature_sd_C": 0.5,
+    "sigma_temp_coeff_per_C": 0.02,
+    "current_rel_sd": 0.01,
+    "scope_gain_rel_sd": 0.015,
+    "mc_samples": 4000,
+    "mc_seed": 2026
+  },
   "part6": {
     "tank_inside_mm": [
       300.0,
@@ -13,8 +51,8 @@
     ],
     "stim_disk_diameter_mm": 0.5,
     "plate_mm": [
-      60.0,
-      60.0,
+      80.0,
+      80.0,
       5.0
     ],
     "return_xy_mm": [
@@ -49,7 +87,10 @@
       7.0,
       10.0,
       15.0,
-      20.0
+      20.0,
+      25.0,
+      45.0,
+      60.0
     ],
     "recording_tip_z_mm": [
       0.5,
@@ -61,6 +102,108 @@
     "current_nominal_A": [
       5e-05,
       0.0001
+    ]
+  },
+  "experiments": {
+    "_comment": "Part 6 layouts. Each = part6 with the listed fields replaced. Delete a layout that will not be built. Geometry here is ASSUMED until measured.",
+    "E1_distance": {
+      "description": "Disk flush in the insulating plate, return wire at the far wall",
+      "overrides": {}
+    },
+    "E2_no_plate": {
+      "description": "Same wire end, no plate: on a thin insulated post in open saline",
+      "overrides": {
+        "support": {
+          "type": "post",
+          "diameter_mm": 1.0,
+          "height_mm": 50.0
+        }
+      }
+    },
+    "E3_return_top": {
+      "description": "Return = metal sheet above the electrode (the array's top-plate return)",
+      "overrides": {
+        "return": {
+          "type": "plate",
+          "size_mm": [
+            100.0,
+            100.0
+          ],
+          "centre_xy_mm": [
+            150.0,
+            100.0
+          ],
+          "height_above_stim_mm": 20.0
+        }
+      }
+    },
+    "E3_return_ring": {
+      "description": "Return = ring on the plate around the electrode (the array's periphery return)",
+      "overrides": {
+        "return": {
+          "type": "ring",
+          "centre_xy_mm": [
+            150.0,
+            100.0
+          ],
+          "radius_mm": 30.0,
+          "width_mm": 0.5
+        }
+      }
+    }
+  },
+  "saline_concentrations": {
+    "_comment": "Two concentrations (experiment e): readings x sigma / I must collapse. Nominal conductivities; the measured values go in the sessions CSV.",
+    "nominal_sigma_S_per_m": [
+      1.55,
+      0.8
+    ]
+  },
+  "anisotropic": {
+    "_comment": "Anisotropic block (experiment 8, built last). ASSUMED until printed and measured. Keep: plates and gaps 1.0 mm, slot width an odd whole number of mm (1 or 3), slot pitch an even whole number of mm. A variant may set its own slot_width_mm.",
+    "plate_thickness_mm": 1.0,
+    "gap_mm": 1.0,
+    "slot_width_mm": 1.0,
+    "block_x_mm": 39.0,
+    "n_plates_each_side": 10,
+    "block_height_mm": 40.0,
+    "staggered": true,
+    "variants": {
+      "3to1": {
+        "slot_pitch_mm": 8.0,
+        "slot_width_mm": 3.0
+      },
+      "9to1": {
+        "slot_pitch_mm": 10.0
+      }
+    },
+    "along_distances_mm": [
+      1.0,
+      2.0,
+      3.0,
+      4.0,
+      5.0,
+      7.0,
+      10.0,
+      15.0,
+      18.0,
+      25.0,
+      30.0
+    ],
+    "across_distances_mm": [
+      2.0,
+      4.0,
+      6.0,
+      8.0,
+      10.0,
+      14.0,
+      18.0,
+      25.0,
+      30.0
+    ],
+    "recording_tip_z_mm": [
+      0.5,
+      1.5
     ]
   },
   "part7": {

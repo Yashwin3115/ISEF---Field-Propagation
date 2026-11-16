@@ -19,3 +19,8 @@ figures/phantom_predictions/*DRAFT*/
 notes/aim2_split_quick.json
 results/_test_array_compare/
 data/array/
+results/interface_predictions/interface_quick/
+figures/interface_predictions/interface_quick/
+results/interface_comparison/interface_quick/
+results/aniso_predictions/aniso_quick/
+figures/aniso_predictions/aniso_quick/

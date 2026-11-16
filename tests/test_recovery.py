@@ -73,8 +73,9 @@ check("onset gains", np.allclose(g[1:], G[1:], rtol=1e-9) and g[0] == -99.0 and 
       f"max rel. error {np.max(np.abs(g[1:]/G[1:]-1)):.1e}; saturated electrode -> fallback")
 
 # 6 SALPA, original implementation (skipped if the package is not installed)
-from recovery import salpa_available, salpa_clean
+from recovery import salpa_available, salpa_clean, salpa_provenance, SALPA_INSTALL
 if salpa_available():
+    print(f"      using {salpa_provenance()}")
     tt = -1e-3 + np.arange(120) * TS
     art = np.where(tt > 0.2e-3, 2e-3 * np.exp(-(tt - 0.2e-3) / 0.6e-3), 0)
     y = (art + rng.normal(0, 5e-6, 120))[None, :]
@@ -85,6 +86,6 @@ if salpa_available():
     check("SALPA (original) removes a slow artifact", late.sum() > 20 and rms < 8,
           f"residual {rms:.1f} uV rms after 2.5 ms (noise 5; artifact up to 2000 uV)")
 else:
-    print("SKIP  SALPA (original): package not installed -- pip install salpa (Python >= 3.12)")
+    print("SKIP  SALPA (original): package not installed -- " + SALPA_INSTALL)
 
 print("ALL PASS" if ok_all else "SOME FAILED")

@@ -93,7 +93,8 @@ from maxone import transfer_run, PITCH, PROVISIONAL, um, mm
 from interface import capacitance_from_impedance
 from recovery import (WAVEFORMS, record, noise_level, detect_fast, fit_physics, lowrank,
                       blank_interp, unit_current_fine, unit_current_binned, bin_average, TS,
-                      salpa_available, salpa_clean, SALPA_LABEL, SALPA_PEG_LABEL, SALPA_DEFAULTS)
+                      salpa_available, salpa_clean, SALPA_LABEL, SALPA_PEG_LABEL, SALPA_DEFAULTS,
+                      salpa_provenance, SALPA_INSTALL)
 
 QUICK = "--quick" in sys.argv
 label = "aim2_budget_quick" if QUICK else "aim2_budget"
@@ -448,14 +449,14 @@ for HP, level in itertools.product(HP_LIST, LEVELS):
             r, *_ = evaluate([sc[p][0] for p in T], [sc[p][1] for p in T], [data[p][2] for p in T],
                              [data[p][3] for p in T], [data[p][1] for p in T], k)
             r.update({"parameters": dict(SALPA_DEFAULTS, forced_peg_samples=fp),
-                      "provenance": "PyPI salpa 1.0; github.com/wagenadl/salpa commit 8c06ce7; "
-                                    "GPL-3.0-or-later; installed, not copied"})
+                      "provenance": salpa_provenance() + "; GPL-3.0-or-later; "
+                                    "installed, not copied"})
             out["methods"][lab] = {str(b): [r] for b in BUDGETS}
             print(f"  {lab:48s} k {k:4.1f}  recall(<1 ms) {r['recall_evoked_0_1ms']}  "
                   f"earliest {r['earliest_recovery_ms']}  FP {r['fp_rate']:.2f}/el/s", flush=True)
     elif level == list(LEVELS)[0]:
-        print("  SALPA arm SKIPPED: the original package is not installed (pip install salpa; "
-              "needs Python >= 3.12)")
+        print("  SALPA arm SKIPPED: the original package is not installed. Install with:\n    "
+              + SALPA_INSTALL + "\n  (Python >= 3.12 and a C++ compiler)")
 
     # spike-absorption check (step 22): same test pulses without spikes
     nospk, _ = make_data(HP, level, with_spikes=False, ids=T)

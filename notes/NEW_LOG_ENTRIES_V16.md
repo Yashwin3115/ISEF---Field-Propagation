@@ -56,7 +56,10 @@ Run each item on the Mac first; copy an entry only after your numbers match
 
 2026-11-11 — SALPA (step 28): the ORIGINAL implementation, used directly:
   PyPI `salpa` 1.0 (author D. A. Wagenaar; github.com/wagenadl/salpa commit
-  8c06ce7; GPL-3.0-or-later), installed with pip, not copied. Author's
+  8c06ce7; GPL-3.0-or-later), installed with pip, not copied. PyPI has
+  wheels only for Linux/Windows, so on the Mac it is built from the author's
+  source at commit 8c06ce7. Check: source build vs PyPI wheel, 40 shared
+  traces (5964 samples) -> bitwise identical (Linux). Author's
   command-line defaults (src/salpa.cpp): tau 3 ms, blank-depeg 20, ahead 5,
   asymmetry 10 samples, threshold 3 x noise SD. Snippets embedded in
   generated baseline noise (SALPA needs ~4 ms of history). Test: residual

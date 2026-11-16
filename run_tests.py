@@ -44,7 +44,13 @@ QUICK = [
     ("Anisotropic point source",     ["tests/test_anisotropic.py"]),
     ("Phantom analysis chain",       ["tests/test_phantom_compare.py"]),
     ("Array comparison (fake data)", ["tests/test_array_compare.py"]),
+    ("Phantom layouts, reciprocity", ["tests/test_phantom_layouts.py"]),
     ("Phantom predictions (quick)",  ["runs/phantom_predict.py", "--quick"]),
+    ("Scope data loader",            ["tests/test_scope.py"]),
+    ("CPE interface and transient",  ["tests/test_transient.py"]),
+    ("Interface pipeline (demo)",    ["tests/test_interface_pipeline.py"]),
+    ("Anisotropic block model",      ["tests/test_aniso_block.py"]),
+    ("Anisotropic design (quick)",   ["runs/aniso_design.py", "--quick"]),
     ("Saturation map (quick)",       ["runs/saturation_map.py", "--quick"]),
     ("Aim 2 budget study (quick)",   ["runs/aim2_budget.py", "--quick"]),
     ("Stimulator sweep (quick)",     ["runs/stimulator_sweep.py", "--quick"]),
@@ -55,6 +61,7 @@ SLOW = [
     ("Aim 3 maps (quick)",           ["runs/aim3_maps.py", "--quick"]),
     ("Anisotropic MaxOne (quick)",   ["runs/anisotropic_maxone.py", "--quick"]),
     ("Pad-size sensitivity (quick)", ["runs/pad_size_sensitivity.py", "--quick"]),
+    ("Anisotropic block (quick)",    ["runs/aniso_predict.py", "--quick"]),
 ]
 
 tests = QUICK + (SLOW if "--all" in sys.argv else [])

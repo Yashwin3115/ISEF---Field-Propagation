@@ -1,27 +1,29 @@
-"""Phantom comparison (research plan v16, Parts 6-7 analysis): measured vs
-COMMITTED predictions. Used by runs/phantom_compare.py; tested by
-tests/test_phantom_compare.py on synthetic data.
+"""Phantom comparison (research plan v16 Parts 6-7 + the Nov 15 experiment
+list): measured vs COMMITTED predictions. Used by runs/phantom_compare.py;
+tested by tests/test_phantom_compare.py on synthetic data.
 
 Inputs (CSV, templates in notes/):
-  measurements:  one row per (session, position, condition, pulse width, amplitude):
-      part, session, position, condition, stim_index, pulse_width_us, current_A,
+  measurements:  one row per (session, layout, position, condition, pulse width, amplitude):
+      part, session, layout, position, condition, stim_index, pulse_width_us, current_A,
       current_rel_sd, plateau_V, plateau_V_sd, n_traces, noise_floor_V
-      part 6: position = index into the committed distances (0-9);
+      part 6: layout = the experiment name in the setup file (E1_distance, ...);
+              position = index into the committed distances;
               condition = A (scope ground at the return) or B (far reference wire)
-      part 7: position = index along the committed traverse (0-11);
-              condition = A
+      part 7: position = index along the committed traverse; condition = A
   sessions:      session, part, sigma_start, sigma_end, sigma_rel_sd,
                  temp_start_C, temp_end_C, sigma_in_start, sigma_in_end
                  (sigma_in_*: agar, part 7 only; sigma_* is the saline)
-  reciprocity:   session, distance_mm, V_forward, V_swapped (optional)
+  reciprocity:   session, layout, distance_mm, V_forward, V_swapped, noise_floor_V
 
-Tests applied (all fixed before measurement, in predictions.json):
-  coverage of every reading by its 95% band (conditions A and B, traverse)
+Tests applied (all fixed before measurement, in predictions.json and
+pass_criteria.json):
+  coverage of every reading by its committed band (each layout, A and B, traverse)
   the A - B difference: predicted to be the SAME at every position
-  the gradient ratio across the agar interface, from the same four points
-  and differences as the prediction, corrected to the measured conductivities
+  the plate ratio (plate / no plate) and the return ratios (other return / far wall)
+  two saline concentrations: readings x sigma / I collapse
+  the gradient ratio across the agar interface
 
-Statistical units (plan 5.12): one row = one measurement (20 averaged traces
+Statistical units (plan 5.12): one row = one measurement (N averaged traces
 at one position in one session). Paired tests pair the SAME measurement
 under different models. The decay-exponent bootstrap resamples sessions,
 then positions within each session -- never samples.
@@ -34,7 +36,9 @@ from scipy import stats
 MODELS_B = {"full model": "G_B_per_m",
             "point, full space": "G_point_full_space_per_m",
             "point, half space": "G_point_half_space_per_m",
-            "disk, half space": "G_disk_half_space_per_m"}
+            "disk, half space": "G_disk_half_space_per_m",
+            "point, full space, referenced": "G_point_full_space_referenced_per_m",
+            "point, half space, referenced": "G_point_half_space_referenced_per_m"}
 
 
 def read_csv(path):
@@ -70,9 +74,32 @@ def _cond(m):
     return c
 
 
+def layout_of(m, pred):
+    lay = str(m.get("layout", "") or "").strip()
+    if not lay or lay not in pred.get("experiments", {}):
+        if lay and "experiments" in pred:
+            raise ValueError(f"layout {lay!r} is not in the committed predictions "
+                             f"({list(pred['experiments'])})")
+        lay = next(iter(pred["experiments"])) if "experiments" in pred else "baseline"
+    return lay
+
+
+def _exp(pred, lay):
+    return pred["experiments"][lay] if "experiments" in pred else pred["part6"]
+
+
+def gain_sd(pred):
+    return float(pred.get("setup", {}).get("uncertainties", {}).get("scope_gain_rel_sd", 0.0) or 0.0)
+
+
 def predict_rows(meas, sessions, pred):
-    """Attach V_pred (each applicable model) and the 95% band to every row."""
+    """Attach V_pred (each applicable model) and the committed band to every
+    row. Rule (predictions.json): covered if the reading lies between the
+    band limits I G_lo / sigma and I G_hi / sigma, each half-width widened in
+    quadrature by 2 sqrt(u_sigma^2 + u_I^2 + u_gain^2) |V_pred|, then by
+    2 x the reading's noise floor."""
     sess = {str(s["session"]): s for s in sessions}
+    u_gain = gain_sd(pred)
     out = []
     for m in meas:
         s = sess[str(m["session"])]
@@ -81,73 +108,182 @@ def predict_rows(meas, sessions, pred):
         I = m["current_A"]
         r = dict(m)
         r["condition"] = _cond(m)
+        u_extra = 0.0
         if int(m["part"]) == 6:
-            row = pred["part6"]["rows"][int(m["position"])]
+            lay = layout_of(m, pred)
+            r["layout"] = lay
+            row = _exp(pred, lay)["rows"][int(m["position"])]
             r["distance_mm"] = row["distance_mm"]
-            if r["condition"] == "A":
-                G, U_num, U_pos, U_ref = row["G_A_per_m"], row["U_num_A_rel"], row["U_pos_A_rel"], 0.0
+            c = r["condition"]
+            G, G_lo, G_hi = row[f"G_{c}_per_m"], row[f"G_{c}_lo_per_m"], row[f"G_{c}_hi_per_m"]
+            if c == "A":
                 r["V_models"] = {"full model": I * G / sig}
             else:
-                G, U_num, U_pos, U_ref = row["G_B_per_m"], row["U_num_B_rel"], row["U_pos_B_rel"], \
-                    row.get("U_refpos_B_rel", 0.0)
-                r["V_models"] = {name: I * row[k] / sig for name, k in MODELS_B.items()}
-            r["V_pred"] = I * G / sig
-            U = np.sqrt(U_num ** 2 + U_pos ** 2 + U_ref ** 2 + (2 * u_sig) ** 2 + (2 * u_I) ** 2)
+                r["V_models"] = {name: I * row[k] / sig for name, k in MODELS_B.items() if k in row}
+            # the prediction is "clearly not zero": used to decide where relative errors mean anything
+            r["well_above_zero"] = bool(abs(G) >= 3 * (G_hi - G_lo))
         else:
             p7 = pred["part7"][int(m.get("stim_index", 0) or 0)]
             sig_in, u_in, _ = session_sigma(s, inner=True)
             ratio = sig_in / sig
             k = int(float(m["position"]))
-            G0, U_num, dl, U_pos = p7["G_per_m"][k], p7["U_num_rel"][k], p7["dlnG_dln_ratio"][k], p7["U_pos_rel"][k]
+            dl = p7["dlnG_dln_ratio"][k]
             r["distance_mm"] = p7["traverse_distances_mm"][k]
-            G = G0 * (ratio / p7["ratio_in_out_nominal"]) ** dl
-            r["V_pred"] = I * G / sig
-            r["V_models"] = {"full model": r["V_pred"]}
-            u_ratio = np.hypot(u_sig, u_in) * abs(dl)
-            U = np.sqrt(U_num ** 2 + U_pos ** 2 + (2 * u_sig) ** 2 + (2 * u_I) ** 2 + (2 * u_ratio) ** 2)
-        r["U_rel"] = float(U)
-        r["band_V"] = float(U * abs(r["V_pred"]) + 2 * (m.get("noise_floor_V", 0.0) or 0.0))
-        r["covered"] = bool(abs(m["plateau_V"] - r["V_pred"]) <= r["band_V"])
+            fac = (ratio / p7["ratio_in_out_nominal"]) ** dl
+            G, G_lo, G_hi = p7["G_per_m"][k] * fac, p7["G_lo_per_m"][k] * fac, p7["G_hi_per_m"][k] * fac
+            r["V_models"] = {"full model": I * G / sig}
+            u_extra = np.hypot(u_sig, u_in) * abs(dl)
+            r["well_above_zero"] = True
+        Vp = I * G / sig
+        mult = 2 * np.sqrt(u_sig ** 2 + u_I ** 2 + u_gain ** 2 + u_extra ** 2) * abs(Vp)
+        noise = 2 * (m.get("noise_floor_V", 0.0) or 0.0)
+        lo, hi = sorted((I * G_lo / sig, I * G_hi / sig))
+        r["V_pred"] = Vp
+        r["band_lo_V"] = float(Vp - np.hypot(Vp - lo, mult) - noise)
+        r["band_hi_V"] = float(Vp + np.hypot(hi - Vp, mult) + noise)
+        r["band_V"] = float(max(Vp - r["band_lo_V"], r["band_hi_V"] - Vp))
+        r["U_rel"] = float(r["band_V"] / abs(Vp)) if Vp else float("inf")
+        r["covered"] = bool(r["band_lo_V"] <= m["plateau_V"] <= r["band_hi_V"])
         r["sigma_used"] = sig
+        r["u_sigma"] = u_sig
         r["sigma_drift_rel"] = drift
         out.append(r)
     return out
 
 
 def difference_test(rows, sessions, pred):
-    """Part 6: V_A - V_B at each (session, position, pulse width, current)
-    pair, against the committed position-independent difference."""
-    sess = {str(s["session"]): s for s in sessions}
-    D = pred["part6"]["difference_A_minus_B"]
+    """Part 6: V_A - V_B at each (session, layout, position, pulse width,
+    current) pair, against the committed position-independent difference."""
+    u_gain = gain_sd(pred)
     pairs = {}
     for r in rows:
         if int(r["part"]) != 6:
             continue
-        key = (str(r["session"]), int(r["position"]), r.get("pulse_width_us"), round(r["current_A"], 9))
+        key = (str(r["session"]), r["layout"], int(r["position"]), r.get("pulse_width_us"),
+               round(r["current_A"], 9))
         pairs.setdefault(key, {})[r["condition"]] = r
     out = []
     for key, pr in pairs.items():
         if "A" not in pr or "B" not in pr:
             continue
         a, b = pr["A"], pr["B"]
-        sig, u_sig, _ = session_sigma(sess[key[0]])
+        D = _exp(pred, key[1])["difference_A_minus_B"]
+        sig, u_sig = a["sigma_used"], a["u_sigma"]
         I = 0.5 * (a["current_A"] + b["current_A"])
         u_I = max(a.get("current_rel_sd", 0) or 0, b.get("current_rel_sd", 0) or 0)
         Vp = I * D["G_A_minus_B_per_m"] / sig
-        U = np.sqrt(D["U_num_rel"] ** 2 + D["U_refpos_rel"] ** 2 + (2 * u_sig) ** 2 + (2 * u_I) ** 2)
-        noise = np.hypot(a.get("noise_floor_V", 0) or 0, b.get("noise_floor_V", 0) or 0)
+        lo, hi = sorted((I * D["G_lo_per_m"] / sig, I * D["G_hi_per_m"] / sig))
+        mult = 2 * np.sqrt(u_sig ** 2 + u_I ** 2 + u_gain ** 2) * abs(Vp)
+        noise = 2 * np.hypot(a.get("noise_floor_V", 0) or 0, b.get("noise_floor_V", 0) or 0)
         Vm = a["plateau_V"] - b["plateau_V"]
-        out.append({"session": key[0], "position": key[1], "distance_mm": a["distance_mm"],
-                    "pulse_width_us": key[2], "current_A": I, "V_meas": Vm, "V_pred": Vp,
-                    "band_V": U * abs(Vp) + 2 * noise,
-                    "covered": bool(abs(Vm - Vp) <= U * abs(Vp) + 2 * noise),
-                    "V_meas_over_I": Vm / I})
+        blo, bhi = Vp - np.hypot(Vp - lo, mult) - noise, Vp + np.hypot(hi - Vp, mult) + noise
+        out.append({"session": key[0], "layout": key[1], "position": key[2], "distance_mm": a["distance_mm"],
+                    "pulse_width_us": key[3], "current_A": I, "V_meas": Vm, "V_pred": Vp,
+                    "band_lo_V": float(blo), "band_hi_V": float(bhi),
+                    "covered": bool(blo <= Vm <= bhi), "V_meas_over_I": Vm / I,
+                    "noise_rel": float(noise / 2 / abs(Vm)) if Vm else None})
     # flatness: is the measured difference the same at every position?
     flat = {}
-    for sname in set(o["session"] for o in out):
-        v = np.array([o["V_meas_over_I"] for o in out if o["session"] == sname])
-        flat[sname] = {"n": len(v), "rel_spread": float(np.ptp(v) / abs(np.mean(v))) if len(v) > 1 else None}
+    for key in sorted(set((o["session"], o["layout"]) for o in out)):
+        sel = [o for o in out if (o["session"], o["layout"]) == key]
+        v = np.array([o["V_meas_over_I"] for o in sel])
+        nz = max((o["noise_rel"] or 0) for o in sel)
+        flat[f"{key[0]} / {key[1]}"] = {
+            "n": len(v), "rel_spread": float(np.ptp(v) / abs(np.mean(v))) if len(v) > 1 else None,
+            "allowed_rel_spread": float(np.hypot(0.02, 2 * np.sqrt(2) * 2 * nz))}
     return out, flat
+
+
+def _normalized(rows, layout, condition="B"):
+    """V sigma / I for every part-6 reading of one layout and condition, keyed
+    by (position, pulse width); readings from several sessions are averaged."""
+    acc = {}
+    for r in rows:
+        if int(r["part"]) != 6 or r["layout"] != layout or r["condition"] != condition:
+            continue
+        key = (int(r["position"]), r.get("pulse_width_us"))
+        x = r["plateau_V"] * r["sigma_used"] / r["current_A"]
+        nz = (r.get("noise_floor_V", 0) or 0) / abs(r["plateau_V"]) if r["plateau_V"] else 0.0
+        acc.setdefault(key, []).append((x, nz, r["u_sigma"], r.get("current_rel_sd", 0) or 0,
+                                        str(r["session"]), r["distance_mm"]))
+    out = {}
+    for key, v in acc.items():
+        a = np.array([q[:4] for q in v], float)
+        n = len(v)
+        out[key] = {"x": float(a[:, 0].mean()), "noise_rel": float(np.sqrt(np.mean(a[:, 1] ** 2) / n)),
+                    "u_sigma": float(a[:, 2].max()), "u_I": float(a[:, 3].max()),
+                    "sessions": sorted(set(q[4] for q in v)), "distance_mm": v[0][5]}
+    return out
+
+
+def ratio_test(rows, pred, table, num_layout, den_layout, simple_value, condition="B"):
+    """A committed ratio of two layouts' readings at the same distance (the
+    plate ratio, a return ratio): measured ratio of V sigma / I, the committed
+    band (independent probe placements, grid) widened in quadrature by
+    2 sqrt(u_sigma terms + 2 u_I^2 + 2 u_gain^2) and by both noise floors.
+    The conductivity terms drop out when both readings come from the same
+    session (same saline). Also returns each reading's distance from the full
+    model and from the simple model's constant value."""
+    u_gain = gain_sd(pred)
+    N, D = _normalized(rows, num_layout, condition), _normalized(rows, den_layout, condition)
+    out = []
+    for key in sorted(set(N) & set(D), key=lambda k: (k[0], str(k[1]))):
+        q = table[key[0]]
+        if not q["usable"]:
+            continue
+        n, d = N[key], D[key]
+        Rm = n["x"] / d["x"]
+        same = n["sessions"] == d["sessions"]
+        w = 2 * np.sqrt((0 if same else n["u_sigma"] ** 2 + d["u_sigma"] ** 2) + n["u_I"] ** 2
+                        + d["u_I"] ** 2 + 2 * u_gain ** 2 + n["noise_rel"] ** 2 + d["noise_rel"] ** 2)
+        R = q["ratio"]
+        lo, hi = R - np.hypot(R - q["lo"], w * R), R + np.hypot(q["hi"] - R, w * R)
+        out.append({"position": key[0], "distance_mm": q["distance_mm"], "pulse_width_us": key[1],
+                    "R_meas": float(Rm), "R_pred": float(R), "band": [float(lo), float(hi)],
+                    "covered": bool(lo <= Rm <= hi), "e_full": float(abs(Rm - R)),
+                    "e_simple": float(abs(Rm - simple_value)), "same_session": same})
+    return out
+
+
+def sigma_collapse_test(rows, pred, min_sigma_ratio=1.1):
+    """Two saline concentrations (experiment e): the same layout, position and
+    condition read in sessions whose conductivities differ by more than
+    min_sigma_ratio. G does not depend on sigma, so (V sigma / I) must be the
+    same. Band: the committed repositioning band (the probe is put back between
+    sessions) widened by both sessions' conductivity, current, gain and noise."""
+    u_gain = gain_sd(pred)
+    groups = {}
+    for r in rows:
+        if int(r["part"]) != 6:
+            continue
+        key = (r["layout"], int(r["position"]), r["condition"], r.get("pulse_width_us"))
+        groups.setdefault(key, {}).setdefault(str(r["session"]), []).append(r)
+    out = []
+    for key, by_s in groups.items():
+        ss = sorted(by_s, key=lambda k: by_s[k][0]["sigma_used"])
+        if len(ss) < 2:
+            continue
+        lo_s, hi_s = ss[0], ss[-1]
+        if by_s[hi_s][0]["sigma_used"] / by_s[lo_s][0]["sigma_used"] < min_sigma_ratio:
+            continue
+        def norm(rr):
+            x = np.mean([r["plateau_V"] * r["sigma_used"] / r["current_A"] for r in rr])
+            nz = np.sqrt(np.mean([((r.get("noise_floor_V", 0) or 0) / abs(r["plateau_V"])) ** 2 for r in rr]) / len(rr))
+            return x, nz, rr[0]["u_sigma"], max((r.get("current_rel_sd", 0) or 0) for r in rr)
+        xh, nh, uh, ih = norm(by_s[hi_s]); xl, nl, ul, il = norm(by_s[lo_s])
+        c = xh / xl
+        row = _exp(pred, key[0])["rows"][key[1]]
+        rep = row.get(f"reposition_ratio_{key[2]}_band", [1.0, 1.0])
+        w = 2 * np.sqrt(uh ** 2 + ul ** 2 + ih ** 2 + il ** 2 + 2 * u_gain ** 2 + nh ** 2 + nl ** 2)
+        if not all(np.isfinite(rep)) or not by_s[hi_s][0]["well_above_zero"]:
+            continue
+        lo, hi = 1 - np.hypot(1 - rep[0], w), 1 + np.hypot(rep[1] - 1, w)
+        out.append({"layout": key[0], "position": key[1], "distance_mm": row["distance_mm"],
+                    "condition": key[2], "pulse_width_us": key[3], "sessions": [lo_s, hi_s],
+                    "sigma": [by_s[lo_s][0]["sigma_used"], by_s[hi_s][0]["sigma_used"]],
+                    "collapse_ratio": float(c), "band": [float(lo), float(hi)],
+                    "covered": bool(lo <= c <= hi)})
+    return out
 
 
 def gradient_ratio_test(rows, sessions, pred):
@@ -184,13 +320,25 @@ def gradient_ratio_test(rows, sessions, pred):
         U_noise = float(np.sqrt(sum((ratio_of(V + np.eye(4)[k] * noise[k]) / R_meas - 1) ** 2
                                     for k in range(4)))) if np.any(noise) else 0.0
         u_ratio = np.hypot(u_sig, u_in) * abs(gr["dlnR_dln_ratio"])
-        U = np.sqrt(gr["U_num_rel"] ** 2 + gr["U_pos_rel"] ** 2 + U_noise ** 2 + (2 * u_ratio) ** 2)
+        # committed band (positions + grid) scaled to the measured conductivities,
+        # widened by the session's noise and conductivity-ratio uncertainty
+        fac = R_pred / gr["fd_prediction"]
+        blo, bhi = (np.array(gr["band_position_and_grid"]) * fac if "band_position_and_grid" in gr else
+                    R_pred * np.array([1 - np.hypot(gr["U_num_rel"], gr["U_pos_rel"]),
+                                       1 + np.hypot(gr["U_num_rel"], gr["U_pos_rel"])]))
+        w = np.hypot(2 * U_noise, 2 * u_ratio) * abs(R_pred)
+        lo, hi = R_pred - np.hypot(R_pred - blo, w), R_pred + np.hypot(bhi - R_pred, w)
+        uni = gr.get("uniform_medium_ratio")
         out.append({"session": key[0], "stim_index": key[1], "pulse_width_us": key[2],
                     "current_A": key[3], "R_meas": float(R_meas), "R_pred": float(R_pred),
+                    "band": [float(lo), float(hi)],
                     "R_ideal_measured_sigmas": float(sig / sig_in),
                     "gap_fd_vs_ideal": float(R_pred / (sig / sig_in) - 1),
-                    "U_rel": float(U), "U_noise_rel": U_noise,
-                    "covered": bool(abs(R_meas - R_pred) <= U * abs(R_pred))})
+                    "U_rel": float(max(R_pred - lo, hi - R_pred) / abs(R_pred)), "U_noise_rel": U_noise,
+                    "covered": bool(lo <= R_meas <= hi),
+                    "uniform_medium_ratio": uni,
+                    "uniform_medium_excluded": (None if uni is None else
+                                                bool(not (R_meas - (R_pred - lo) <= uni <= R_meas + (hi - R_pred))))})
     return out
 
 
@@ -201,6 +349,7 @@ def coverage(rows):
 
 def errors_by_model(rows):
     """Relative error and RMSE per model (part 6 rows)."""
+    rows = [r for r in rows if r.get("well_above_zero", True)]
     names = list(rows[0]["V_models"]) if rows else []
     res = {}
     for n in names:
@@ -264,11 +413,19 @@ def decay_exponent(rows, n_boot=1000, seed=0, rmin_mm=None, rmax_mm=None):
                      "confidence interval (plan 5.12)") if len(keys) <= 2 else ""}
 
 
-def reciprocity(rows):
+def reciprocity(rows, floor_rel=0.02):
+    """Swap the driven pair and the measured pair: V / I must not change, in any
+    layout (no model input). Allowed difference, fixed in advance:
+    sqrt(floor^2 + (2 sqrt2 noise / |V|)^2), with the noise floor from the
+    optional noise_floor_V column."""
     out = []
     for r in rows:
         d = (r["V_swapped"] - r["V_forward"]) / r["V_forward"]
-        out.append({"session": r["session"], "distance_mm": r["distance_mm"], "rel_difference": float(d)})
+        nz = (r.get("noise_floor_V", 0) or 0)
+        nz = float(nz) / abs(r["V_forward"]) if isinstance(nz, (int, float)) else 0.0
+        tol = float(np.hypot(floor_rel, 2 * np.sqrt(2) * nz))
+        out.append({"session": r["session"], "layout": r.get("layout", ""), "distance_mm": r["distance_mm"],
+                    "rel_difference": float(d), "allowed": tol, "pass": bool(abs(d) <= tol)})
     return out
 
 
@@ -276,7 +433,8 @@ def linearity(rows):
     """V / I at each (session, position, pulse width) across amplitudes: should be constant."""
     groups = {}
     for r in rows:
-        key = (str(r["session"]), str(r["position"]), r.get("condition", "A"), r.get("pulse_width_us"))
+        key = (str(r["session"]), r.get("layout", ""), str(r["position"]), r.get("condition", "A"),
+               r.get("pulse_width_us"))
         groups.setdefault(key, []).append(r["plateau_V"] / r["current_A"])
     spreads = [np.ptp(v) / np.mean(v) for v in groups.values() if len(v) >= 2]
     return {"groups_with_2plus_amplitudes": len(spreads),

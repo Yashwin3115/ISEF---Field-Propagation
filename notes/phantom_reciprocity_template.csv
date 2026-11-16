@@ -1,4 +1,5 @@
-session,distance_mm,V_forward,V_swapped
-1,2.0,,
-1,5.0,,
-1,10.0,,
+session,layout,distance_mm,V_forward,V_swapped,noise_floor_V
+1,E1_distance,2.0,,,
+1,E1_distance,5.0,,,
+1,E1_distance,10.0,,,
+2,E3_return_ring,5.0,,,
